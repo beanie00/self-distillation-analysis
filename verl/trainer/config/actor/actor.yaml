@@ -102,10 +102,10 @@ self_distillation:
   teacher_regularization: ema
 
   # EMA update rate for teacher weights, or trust-region mixing coefficient
-  teacher_update_rate: 0.05 
+  teacher_update_rate: 0.0
 
   # Maximum length of the reprompted prompt
-  max_reprompt_len: 10240
+  max_reprompt_len: 22528
 
   # Truncation method for the reprompted prompt (recommended to use "right" or "error")
   reprompt_truncation: right # "left", "right", "error"
@@ -114,7 +114,7 @@ self_distillation:
   dont_reprompt_on_self_success: True
 
   # Whether to remove <think>...</think> tags from successful demonstrations before reprompting
-  remove_thinking_from_demonstration: True
+  remove_thinking_from_demonstration: False
 
   # Whether to include environment feedback in reprompting for wrong attempts
   # If True and feedback exists: use reprompt_template_feedback_solution (with solution) or reprompt_template_feedback (without solution)
