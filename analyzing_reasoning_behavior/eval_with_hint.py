@@ -37,6 +37,7 @@ def parse_args():
     parser.add_argument('--max_tokens', type=int, default=32768)
     parser.add_argument('--top_p', type=float, default=0.95)
     parser.add_argument('--top_k', type=int, default=20)
+    parser.add_argument("--enable_thinking", action="store_true", default=False, help="Enable thinking mode in chat template")
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--output_dir', type=str, default='./outputs_chained')
     parser.add_argument('--no_chat_template', action='store_true')
@@ -72,13 +73,15 @@ def build_augmented_prompt(original_messages, correct_solution):
     return new_messages
 
 
-def get_conversation_prompt(tokenizer, messages):
+def get_conversation_prompt_by_messages(tokenizer, messages, enable_thinking=False):
     kwargs = dict(tokenize=False, add_generation_prompt=True)
-    try:
+    if enable_thinking:
         kwargs['enable_thinking'] = True
-    except Exception:
-        pass
-    return tokenizer.apply_chat_template(messages, **kwargs)
+    try:
+        return tokenizer.apply_chat_template(messages, **kwargs)
+    except TypeError:
+        kwargs.pop('enable_thinking', None)
+        return tokenizer.apply_chat_template(messages, **kwargs)
 
 
 def run_one_round(sampled, llm, tokenizer, sampling_params, args, round_num, solution_key_fn):
@@ -98,7 +101,7 @@ def run_one_round(sampled, llm, tokenizer, sampling_params, args, round_num, sol
         if args.no_chat_template:
             cur_prompt = "\n".join([msg['content'] for msg in augmented_messages])
         else:
-            cur_prompt = get_conversation_prompt(tokenizer, augmented_messages)
+            cur_prompt = get_conversation_prompt_by_messages(tokenizer, augmented_messages, enable_thinking=args.enable_thinking)
         prompt_batch.append(cur_prompt)
 
     print(f"\n[Round {round_num}] Generating responses...")
@@ -201,7 +204,7 @@ def main():
             if args.no_chat_template:
                 cur_prompt = "\n".join([msg['content'] for msg in augmented_messages])
             else:
-                cur_prompt = get_conversation_prompt(tokenizer, augmented_messages)
+                cur_prompt = get_conversation_prompt_by_messages(tokenizer, augmented_messages, enable_thinking=args.enable_thinking)
             prompt_batch.append(cur_prompt)
 
         print(f"\n{'=' * 80}")
@@ -243,7 +246,7 @@ def main():
         for rnd in range(1, args.n_rounds + 1):
             rkey = f'round{rnd}'
             rd = all_rounds[idx][rkey]
-            entry[f'{rkey}_conditioning_solution'] = rd['conditioning_solution'][:500]  # truncate for readability
+            entry[f'{rkey}_conditioning_solution'] = rd['conditioning_solution']  # full length
             entry[f'{rkey}_responses'] = rd['new_responses']
             entry[f'{rkey}_extracted_answers'] = rd['new_extracted_answers']
             entry[f'{rkey}_is_correct'] = rd['new_is_correct']

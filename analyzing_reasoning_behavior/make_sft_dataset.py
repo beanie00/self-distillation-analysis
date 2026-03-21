@@ -54,16 +54,25 @@ def main():
         prev_entry = {
             "instruction": instruction,
             "input": "",
-            "output": r['prev_correct_solution'],
+            "output": r['round1_conditioning_solution'],
             "system": system,
         }
         prev_dataset.append(prev_entry)
 
-        # New response: just use the first one (correct or not)
+        # Pick the first correct response from round 1, skip if none
+        correct_resp = None
+        for resp, is_correct in zip(r['round1_responses'], r['round1_is_correct']):
+            if is_correct:
+                correct_resp = resp
+                break # skip problems with no correct response in round 1
+
+        if correct_resp is None:
+            continue 
+
         new_entry = {
             "instruction": instruction,
             "input": "",
-            "output": r['new_responses'][0],
+            "output": correct_resp,
             "system": system,
         }
         new_dataset.append(new_entry)
@@ -78,10 +87,10 @@ def main():
     with open(new_path, 'w', encoding='utf-8') as f:
         json.dump(new_dataset, f, ensure_ascii=False, indent=2)
 
-    # Count new response correctness
-    new_correct_cnt = sum(1 for r in data if r['new_is_correct'][0])
+    # Count how many examples have at least one correct response in round 1
+    new_correct_cnt = sum(1 for r in data if any(r['round1_is_correct']))
     print(f"prev_correct: {len(prev_dataset)} examples → {prev_path}")
-    print(f"new_responses: {len(new_dataset)} examples → {new_path}  (correct: {new_correct_cnt}, wrong: {len(new_dataset) - new_correct_cnt})")
+    print(f"new_responses: {len(new_dataset)} examples → {new_path}  (with correct round1: {new_correct_cnt}, without: {len(data) - new_correct_cnt})")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,12 @@
 
 ## Introduction
 
+<div align="center">
+  <video src="figures/intro.mp4" width="800" controls>
+    Your browser does not support the video tag.
+  </video>
+</div>
+
 ## Installation
 
 ### Data Preparation
