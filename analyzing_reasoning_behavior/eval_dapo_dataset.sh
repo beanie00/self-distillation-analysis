@@ -1,0 +1,11 @@
+CUDA_VISIBLE_DEVICES=0,1,2,3 python eval_dapo_dataset.py \
+    --model_name_or_path deepseek-ai/DeepSeek-R1-Distill-Qwen-7B \
+    --enable_thinking \
+    --data_path ../data/math/train.parquet \
+    --data_name dapo_sample_8_100 \
+    --n_sampling 8 \
+    --min_correct 1 \
+    --max_correct 4 \
+    --max_collect 100 \
+    --temperature 0.6 \
+    --batch_size 128

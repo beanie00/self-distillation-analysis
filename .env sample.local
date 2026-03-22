@@ -1,0 +1,13 @@
+# Project configuration - Edit this file to change settings across all scripts
+# This file should be sourced by shell scripts in the project
+
+# Workspace/SDPO directory (same location)
+export WORKSPACE_DIR="<your-workspace-dir>"
+
+# Checkpoint directory
+export CKPT_DIR="<your-checkpoint-dir>"
+
+# User configuration for Weights & Biases
+export USER="<your-username>"
+export WANDB_PROJECT="<your-wandb-project>"
+export WANDB_ENTITY="<your-wandb-entity>"

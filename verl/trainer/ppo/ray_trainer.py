@@ -642,10 +642,22 @@ class RayPPOTrainer:
                 success_by_uid[uid].append(idx)
         return success_by_uid
 
+    # @staticmethod
+    # def _remove_thinking_trace(text: str) -> str:
+    #     """Remove <think>...</think> tags and their content from text."""
+    #     return re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL)
     @staticmethod
     def _remove_thinking_trace(text: str) -> str:
-        """Remove <think>...</think> tags and their content from text."""
-        return re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL)
+        """Remove <think>...</think> tags and their content from text.
+        Also handles cases where opening <think> is missing (e.g., DeepSeek-R1-Distill-7B).
+        """
+        # 1) Normal case: remove matched <think>...</think> pairs
+        result = re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL)
+        # 2) Edge case: no opening <think>, but </think> exists
+        #    (e.g., "reasoning text</think>actual response")
+        #    Remove everything from the start up to and including </think>
+        result = re.sub(r'^.*?</think>\s*', '', result, flags=re.DOTALL)
+        return result
 
     def _get_solution(
         self,

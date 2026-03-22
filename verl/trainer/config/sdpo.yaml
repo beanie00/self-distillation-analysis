@@ -16,7 +16,7 @@ actor_rollout_ref:
     policy_loss:
       loss_mode: sdpo
     self_distillation:
-      max_reprompt_len: 10240
+      max_reprompt_len: 22528
       is_clip: 2.0
     optim:
       lr: 1e-5
