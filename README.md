@@ -2,7 +2,7 @@
 
 # Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?
 
-[![Paper](https://img.shields.io/badge/arXiv-xxxx.xxxx-F46565?style=flat&logo=arxiv&logoColor=white)](https://arxiv.org/abs/xxxx.xxxx) [![Code](https://img.shields.io/badge/GitHub-Code-000000?style=flat&logo=github&logoColor=white)](https://github.com/lasgroup/SDPO) [![W&B](https://img.shields.io/badge/W%26B-Logs-06B6D4?style=flat&logo=weightsandbiases&logoColor=white)](https://wandb.ai/jonhue/SDPO?nw=mgotcx6kk7) [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-HuggingFace-FEE47D?style=flat)](https://huggingface.co/your-repo-here)
+[![Paper](https://img.shields.io/badge/arXiv-xxxx.xxxx-F46565?style=flat&logo=arxiv&logoColor=white)](https://arxiv.org/abs/xxxx.xxxx) [![Code](https://img.shields.io/badge/GitHub-Code-000000?style=flat&logo=github&logoColor=white)](https://github.com/beanie00/self-distillation-analysis) [![W&B](https://img.shields.io/badge/W%26B-Logs-06B6D4?style=flat&logo=weightsandbiases&logoColor=white)](https://wandb.ai/beanie/SDPO-beanie/reports/Why-Does-Self-Distillation-Sometimes-Degrade-the-Reasoning-Capability-of-LLMs---VmlldzoxNjI1MTk5Mw) [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-HuggingFace-FEE47D?style=flat)](https://huggingface.co/collections/beanie00/self-distillation-analysis)
 
 </div>
 
@@ -106,12 +106,25 @@ bash experiments/math/run_math_grpo_small_question.sh
 bash experiments/math/run_math_sdpo_small_question.sh
 ```
 
+All our training was conducted on 4B200 GPUs.
+
 ### Evaluation
 After training, merge the saved FSDP checkpoints into HF format before running evaluation.
 ```bash
 cd eval
 bash merge_models.sh
 bash eval.sh
+```
+
+Additionally, we release trained checkpoints for Qwen3-8B (Thinking ON/OFF) and DeepSeek-Distill-7B.
+👉 **[🤗 Hugging Face Collections](https://huggingface.co/collections/beanie00/self-distillation-analysis)**
+
+
+To quickly run an evaluation using our checkpoints:
+
+```bash
+cd eval
+bash eval_examples.sh
 ```
 
 ## Citation
