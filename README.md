@@ -19,6 +19,8 @@ We further find that the effectiveness of self-distillation is closely tied to t
 
 ## Installation
 
+For environment setup, please follow the [installation instructions in the SDPO README](https://github.com/lasgroup/SDPO/blob/main/README.md).
+
 ### Data Preparation
 We primarily use the [DAPO-Math-17k](https://huggingface.co/datasets/BytedTsinghua-SIA/DAPO-Math-17k) dataset for training. You can download it by running:
 ```bash
