@@ -11,11 +11,13 @@
 ![intro](figures/intro.gif)
 
 Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions). It offers fine-grained credit assignment while keeping a simple setup, and has recently gained attention.
+ 
 
-However, we observe that in the math domain, self-distillation can lead to persistent performance degradation, even when the training signal points in the right direction. We trace this to the suppression of **epistemic verbalization**—the model’s tendency to explicitly reason about its own uncertainty during problem-solving. Because the teacher is conditioned on richer context, it produces confident reasoning that does not express uncertainty. As the student imitates this behavior, it progressively loses the ability to express and leverage uncertainty, undermining exploratory reasoning.
-
-We also observe that effectiveness depends on task coverage. With narrow coverage, suppressing uncertainty shortens responses and boosts in-domain performance. But as coverage broadens, generalization suffers and OOD performance declines, suggesting epistemic verbalization is key for robust reasoning.
-
+⚠️  However, in the math domain, self-distillation can lead to **persistent performance degradation**, even when the training signal points in the right direction.
+ 
+We trace this to the suppression of $\textcolor{#34B591}{\textsf{epistemic\ verbalization}}$, the model's tendency to explicitly reason about its own uncertainty during problem-solving. Because the teacher is conditioned on richer context, it produces confident reasoning that *does not express uncertainty*. As the student imitates this behavior, it progressively loses the ability to express and leverage uncertainty, undermining exploratory reasoning.
+ 
+📌 **Task Coverage Matters** -- With $\textcolor{#DA7B99}{\textsf{narrow coverage}}$, suppressing uncertainty shortens responses and boosts in-domain performance. But as coverage broadens, generalization suffers and OOD performance declines, suggesting that epistemic verbalization is important for robust reasoning, especially on unseen and challenging problems.
 
 ## Installation
 
