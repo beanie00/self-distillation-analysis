@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Runs a single SDPO training experiment locally (no Slurm).
+# Edit the parameters below to choose which configuration to run.
+
+# Load environment configuration
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [ -f "${PROJECT_ROOT}/.env.local" ]; then
+    set +u  # Allow unset variables in .env.local
+    source "${PROJECT_ROOT}/.env.local"
+    set -u
+fi
+export CUDA_VISIBLE_DEVICES=4,5,6,7
+export EXPERIMENT="math-SDPO"
+# Dataset — pick one
+export TASK="data/math"
+DATA_PATH="data/math"
+export RAY_PORT=6380
+
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=true
+    echo "Dry run mode enabled."
+fi
+
+# =============================================================================
+# PICK YOUR CONFIGURATION (edit these)
+# =============================================================================
+CONFIG_NAME="sdpo"  # <-- Changed from "baseline_grpo" to "sdpo"
+
+# Model — pick one
+# MODEL_PATH="Qwen/Qwen3-8B"
+MODEL_PATH="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+# MODEL_PATH="allenai/Olmo-3-7B-Instruct"
+
+# Hyperparameters
+TRAIN_BATCH_SIZE=256
+ROLLOUT_BATCH_SIZE=8
+MINI_BATCH_SIZE=128
+LR=1e-5  # <-- Paper uses 1e-5 for SDPO (see Table 12)
+
+# SDPO-specific hyperparameters
+ALPHA=0.5                          # 0=forward KL, 0.5=Jensen-Shannon, 1=reverse KL
+DISTILLATION_TOPK=100              # Top-K logits for approximate distillation
+DONT_REPROMPT_ON_SELF_SUCCESS=True # Skip reprompting if sample itself succeeded
+
+# GPU settings (adjust to your local machine)
+NUM_GPUS=4  # set to number of GPUs you have
+
+# =============================================================================
+# SETUP
+# =============================================================================
+WORKSPACE_DIR="/workspace/2026-SDPO"
+
+# Install dependencies (skip if already installed)
+if [[ "${SKIP_INSTALL:-false}" != "true" ]]; then
+    echo "Installing dependencies..."
+    pip install word2number latex2sympy2 "math-verify[antlr4_9_3]==0.8.0"
+    pip install -e "$WORKSPACE_DIR"
+    pip install --upgrade wandb
+fi
+
+export PYTHONPATH="$WORKSPACE_DIR:${PYTHONPATH:-}"
+
+# =============================================================================
+# BUILD EXPERIMENT NAME & ARGS
+# =============================================================================
+EXP_NAME="${EXPERIMENT}-${MINI_BATCH_SIZE}-train${TRAIN_BATCH_SIZE}-rollout${ROLLOUT_BATCH_SIZE}-lr${LR}-alpha${ALPHA}-model${MODEL_PATH}"
+
+RAY_TMPDIR="/tmp/ray_sdpo"
+mkdir -p "$RAY_TMPDIR"
+ray stop --force --temp-dir="$RAY_TMPDIR" 2>/dev/null || true
+ray start --head --disable-usage-stats --port=$RAY_PORT --dashboard-port=8266 --temp-dir="$RAY_TMPDIR"
+export RAY_ADDRESS="127.0.0.1:$RAY_PORT"
+
+ARGS="data.train_batch_size=$TRAIN_BATCH_SIZE \
+  trainer.group_name=SDPO-generalization \
+  actor_rollout_ref.actor.optim.lr_warmup_steps=10 \
+  actor_rollout_ref.rollout.n=$ROLLOUT_BATCH_SIZE \
+  actor_rollout_ref.actor.optim.lr=$LR \
+  actor_rollout_ref.actor.ppo_mini_batch_size=$MINI_BATCH_SIZE \
+  actor_rollout_ref.model.path=$MODEL_PATH \
+  algorithm.rollout_correction.rollout_is=token \
+  actor_rollout_ref.actor.self_distillation.distillation_topk=$DISTILLATION_TOPK \
+  actor_rollout_ref.actor.self_distillation.dont_reprompt_on_self_success=$DONT_REPROMPT_ON_SELF_SUCCESS \
+  actor_rollout_ref.actor.self_distillation.alpha=$ALPHA \
+  actor_rollout_ref.actor.self_distillation.include_environment_feedback=False \
+  actor_rollout_ref.rollout.val_kwargs.n=1"
+
+# =============================================================================
+# RUN
+# =============================================================================
+CMD="bash $WORKSPACE_DIR/training/verl_training.sh \"$EXP_NAME\" \"$CONFIG_NAME\" \"$DATA_PATH\" $ARGS"
+
+if [ "$DRY_RUN" = true ]; then
+    echo ""
+    echo "Would run:"
+    echo "  EXP_NAME:  $EXP_NAME"
+    echo "  DATA_PATH: $DATA_PATH"
+    echo "  MODEL:     $MODEL_PATH"
+    echo "  CMD:       $CMD"
+else
+    echo "Running experiment: $EXP_NAME"
+    eval "$CMD"
+fi
