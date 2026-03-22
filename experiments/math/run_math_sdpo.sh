@@ -13,7 +13,7 @@ if [ -f "${PROJECT_ROOT}/.env.local" ]; then
     set -u
 fi
 export CUDA_VISIBLE_DEVICES=4,5,6,7
-export EXPERIMENT="math-SDPO"
+export EXPERIMENT="math-SDPO-DeepSeek-Qwen-7B"
 # Dataset — pick one
 export TASK="data/math"
 DATA_PATH="data/math"
@@ -52,7 +52,11 @@ NUM_GPUS=4  # set to number of GPUs you have
 # =============================================================================
 # SETUP
 # =============================================================================
-WORKSPACE_DIR="/workspace/2026-SDPO"
+# WORKSPACE_DIR is loaded from .env.local
+if [ -z "${WORKSPACE_DIR:-}" ]; then
+    echo "Error: WORKSPACE_DIR not set. Make sure .env.local exists."
+    exit 1
+fi
 
 # Install dependencies (skip if already installed)
 if [[ "${SKIP_INSTALL:-false}" != "true" ]]; then
