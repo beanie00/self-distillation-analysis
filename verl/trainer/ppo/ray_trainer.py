@@ -681,6 +681,85 @@ class RayPPOTrainer:
         return solution_str
 
 
+    def _tokenize_teacher_prompt(self, messages, max_length, enable_thinking):
+        return self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            return_tensors="pt",
+            return_dict=True,
+            continue_final_message=False,
+            add_generation_prompt=True,
+            enable_thinking=enable_thinking,
+            max_length=max_length,
+            padding=True,
+            truncation=True,
+        )
+
+    def _build_rlsd_teacher_batch(
+        self,
+        batch: DataProto,
+        responses: torch.Tensor,
+        response_mask: torch.Tensor,
+        device: torch.device,
+        batch_size: int,
+        self_distillation_cfg,
+    ) -> tuple[DataProto, dict[str, float]]:
+        """Build teacher inputs for RLSD where the teacher sees the ground-truth answer as privileged info.
+
+        RLSD requires only the final ground-truth answer (no reasoning trace), making it the
+        least demanding in terms of privileged information (paper §5.1).
+        The teacher prompt is: [original system messages] + [question + ground_truth_answer].
+        """
+        # Extract ground truths from the batch
+        ground_truths = [
+            item.non_tensor_batch.get("reward_model", {}).get("ground_truth", "") or ""
+            for item in batch
+        ]
+
+        rlsd_template = self_distillation_cfg.get(
+            "rlsd_template",
+            "{prompt}\n\nThe correct answer is: {ground_truth}",
+        )
+
+        def _build_teacher_message(i: int) -> list[dict]:
+            system_messages = batch.non_tensor_batch["raw_prompt"][i][:-1]
+            original_prompt = batch.non_tensor_batch["raw_prompt"][i][-1]["content"]
+            teacher_content = rlsd_template.format(
+                prompt=original_prompt,
+                ground_truth=ground_truths[i],
+            )
+            return system_messages + [{"role": "user", "content": teacher_content}]
+
+        messages = [_build_teacher_message(i) for i in range(batch_size)]
+        enable_thinking = (
+            self.config.data.apply_chat_template_kwargs.get("enable_thinking", True)
+            if self.config.data.apply_chat_template_kwargs
+            else True
+        )
+        teacher_prompt = self._tokenize_teacher_prompt(
+            messages=messages,
+            max_length=self_distillation_cfg.max_reprompt_len,
+            enable_thinking=enable_thinking,
+        )
+        teacher_input_ids = torch.cat([teacher_prompt["input_ids"].to(device), responses], dim=1)
+        teacher_attention_mask = torch.cat([teacher_prompt["attention_mask"].to(device), response_mask], dim=1)
+        teacher_position_ids = compute_position_id_with_mask(teacher_attention_mask)
+
+        # All samples participate in RLSD (teacher signal available for every sample)
+        self_distillation_mask = torch.ones(batch_size, dtype=torch.float32, device=device)
+
+        n_with_gt = sum(1 for gt in ground_truths if gt)
+        metrics = {
+            "rlsd/samples_with_ground_truth": n_with_gt / batch_size,
+        }
+        tensors = {
+            "teacher_input_ids": teacher_input_ids,
+            "teacher_attention_mask": teacher_attention_mask,
+            "teacher_position_ids": teacher_position_ids,
+            "self_distillation_mask": self_distillation_mask,
+        }
+        return DataProto.from_dict(tensors=tensors), metrics
+
     def _maybe_build_self_distillation_batch(
         self,
         batch: DataProto,
@@ -689,7 +768,7 @@ class RayPPOTrainer:
     ) -> Optional[tuple[DataProto, dict[str, float]]]:
         self_distillation_cfg = self.config.actor_rollout_ref.actor.get("self_distillation", None)
         loss_mode = self.config.actor_rollout_ref.actor.policy_loss.get("loss_mode", "vanilla")
-        if self_distillation_cfg is None or loss_mode != "sdpo":
+        if self_distillation_cfg is None or loss_mode not in ("sdpo", "srpo", "rlsd", "rlrt"):
             return None
 
         device = batch.batch["input_ids"].device
@@ -698,6 +777,17 @@ class RayPPOTrainer:
         response_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in responses]
         prompt_texts = [msgs[-1]["content"] for msgs in batch.non_tensor_batch["raw_prompt"]]
         batch_size = batch.batch.batch_size[0]
+
+        # ── RLSD: teacher sees only the ground-truth answer (no reasoning trace) ──
+        if loss_mode == "rlsd":
+            return self._build_rlsd_teacher_batch(
+                batch=batch,
+                responses=responses,
+                response_mask=response_mask,
+                device=device,
+                batch_size=batch_size,
+                self_distillation_cfg=self_distillation_cfg,
+            )
 
         # Extract feedback if available and include_environment_feedback is enabled
         feedback_list = self._collect_feedback(
@@ -759,17 +849,10 @@ class RayPPOTrainer:
 
         messages = [_build_teacher_message(i) for i in range(batch_size)]
         enable_thinking = self.config.data.apply_chat_template_kwargs.get("enable_thinking", True) if self.config.data.apply_chat_template_kwargs else True
-        teacher_prompt = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            return_tensors="pt",
-            return_dict=True,
-            continue_final_message=False,
-            add_generation_prompt=True,
-            enable_thinking=enable_thinking,
+        teacher_prompt = self._tokenize_teacher_prompt(
+            messages=messages,
             max_length=self_distillation_cfg.max_reprompt_len,
-            padding=True,
-            truncation=True,
+            enable_thinking=enable_thinking,
         )
         teacher_input_ids = torch.cat([teacher_prompt["input_ids"].to(device), responses], dim=1)
         teacher_attention_mask = torch.cat([teacher_prompt["attention_mask"].to(device), response_mask], dim=1)
@@ -800,12 +883,19 @@ class RayPPOTrainer:
             "self_distillation/feedback_used_fraction": num_with_feedback_used / batch_size,
             "self_distillation/reprompt_sample_fraction": self_distillation_mask.float().mean().item(),
         }
-        return DataProto.from_dict(tensors={
+        tensors = {
             "teacher_input_ids": teacher_input_ids,
             "teacher_attention_mask": teacher_attention_mask,
             "teacher_position_ids": teacher_position_ids,
             "self_distillation_mask": self_distillation_mask,
-        }), metrics
+        }
+        if loss_mode == "srpo":
+            # correct_mask[i] = 1 if sample i is correct (reward >= threshold), else 0
+            reward_sum = reward_tensor.sum(dim=-1)
+            correct_mask = (reward_sum >= self_distillation_cfg.success_reward_threshold).float().to(device)
+            tensors["correct_mask"] = correct_mask
+            metrics["self_distillation/grpo_fraction"] = correct_mask.mean().item()
+        return DataProto.from_dict(tensors=tensors), metrics
 
     def _get_gen_batch(self, batch: DataProto) -> DataProto:
         reward_model_keys = set({"data_source", "reward_model", "extra_info", "uid", "raw_prompt"}) & batch.non_tensor_batch.keys()
@@ -1496,11 +1586,31 @@ class RayPPOTrainer:
             old_log_prob_mfu = 0
         return old_log_prob, old_log_prob_mfu
 
+    def _compute_rlsd_lambda(self) -> float:
+        """Compute the current RLSD mixing coefficient λ.
+
+        λ starts at rlsd_lambda_init and decays linearly to 0 over rlsd_lambda_decay_steps.
+        After that window, λ = 0 and RLSD reduces to vanilla GRPO.
+        """
+        loss_mode = self.config.actor_rollout_ref.actor.policy_loss.get("loss_mode", "vanilla")
+        if loss_mode not in ("rlsd", "rlrt"):
+            return 1.0
+        sd_cfg = self.config.actor_rollout_ref.actor.get("self_distillation", {})
+        lambda_init = sd_cfg.get("rlsd_lambda_init", 0.5)
+        decay_steps = sd_cfg.get("rlsd_lambda_decay_steps", 50)
+        if decay_steps <= 0:
+            return lambda_init
+        # Linear decay: λ = lambda_init * max(0, 1 - step / decay_steps)
+        progress = min(1.0, (self.global_steps - 1) / decay_steps)
+        return float(lambda_init * (1.0 - progress))
+
     def _update_actor(self, batch: DataProto) -> DataProto:
         rollout_config = self.config.actor_rollout_ref.rollout
         batch.meta_info["multi_turn"] = rollout_config.multi_turn.enable
         # TODO: Make "temperature" single source of truth from generation.
         batch.meta_info["temperature"] = rollout_config.temperature
+        # Pass current RLSD λ so dp_actor can apply the correct interpolation weight
+        batch.meta_info["rlsd_lambda"] = self._compute_rlsd_lambda()
         # update actor
         if self.use_legacy_worker_impl == "disable":
             batch_td = batch.to_tensordict()

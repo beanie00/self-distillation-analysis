@@ -1,0 +1,45 @@
+defaults:
+  - ppo_trainer
+  - user
+  - _self_
+
+# MAX_PROMPT_LENGTH=2048
+# MAX_RESPONSE_LENGTH=8192
+# MAX_FEEDBACK_LENGTH=8192
+# TEMPLATE_LENGTH=512  # heuristic upper bound, not enforced
+# MAX_MODEL_LEN=$((TEMPLATE_LENGTH + MAX_PROMPT_LENGTH + MAX_FEEDBACK_LENGTH + MAX_RESPONSE_LENGTH))
+max_model_len: 18944
+
+actor_rollout_ref:
+  actor:
+    ppo_mini_batch_size: 128
+    policy_loss:
+      loss_mode: srpo
+    self_distillation:
+      max_reprompt_len: 22528
+      is_clip: 2.0
+      # Entropy-aware dynamic weighting (paper §3.2): w̃_t = exp(-β · H_t).
+      # Tune β to control sensitivity to teacher uncertainty.
+      dynamic_weight_beta: 1.0
+      include_environment_feedback: False
+    optim:
+      lr: 5e-6
+      lr_warmup_steps: 10
+  rollout:
+    n: 8
+    calculate_log_probs: True
+    val_kwargs:
+      n: 1
+
+algorithm:
+  adv_estimator: grpo # disables critic
+  norm_adv_by_std_in_grpo: False
+  rollout_correction:
+    rollout_is: token
+    rollout_is_threshold: 2.0
+
+data:
+  train_batch_size: 256
+
+trainer:
+  val_before_train: False

@@ -1,27 +1,60 @@
 <div align="center">
 
-# Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?
+# Self-Distillation for Single-Turn Reasoning
 
-[![Paper](https://img.shields.io/badge/arXiv-2603.24472-F46565?style=flat&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2603.24472) [![Code](https://img.shields.io/badge/GitHub-Code-000000?style=flat&logo=github&logoColor=white)](https://github.com/beanie00/self-distillation-analysis) [![W&B](https://img.shields.io/badge/W%26B-Logs-06B6D4?style=flat&logo=weightsandbiases&logoColor=white)](https://wandb.ai/beanie/SDPO-beanie/reports/Why-Does-Self-Distillation-Sometimes-Degrade-the-Reasoning-Capability-of-LLMs---VmlldzoxNjI1MTk5Mw?accessToken=i1ohtk0lbrcm63kkv1vd99f6jvb71sqoj32rgsokrs4l8r4vjz8q5mywtt8upwho) [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-HuggingFace-FEE47D?style=flat)](https://huggingface.co/collections/beanie00/self-distillation-analysis)
+**An extension of [veRL](https://github.com/volcengine/verl) for post-training LLM reasoners with on-policy self-distillation and self-distilled RLVR.**
+
+[![Code](https://img.shields.io/badge/GitHub-Code-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/beanie00/self-distillation-analysis)
+&nbsp;
+[![Issues](https://img.shields.io/github/issues/beanie00/self-distillation-analysis?style=flat-square&color=green)](https://github.com/beanie00/self-distillation-analysis/issues)
+&nbsp;
+[![Stars](https://img.shields.io/github/stars/beanie00/self-distillation-analysis?style=social)](https://github.com/beanie00/self-distillation-analysis/stargazers)
 
 </div>
 
-## Introduction
+Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions), giving fine-grained credit assignment with a simple setup. In single-turn reasoning (like math), however, imitating the teacher's confident reasoning suppresses the student's own expression of uncertainty and degrades it ([COLM 2026](https://arxiv.org/abs/2603.24472)).
 
-![intro](figures/intro.gif)
+Our answer is **[RLRT](https://arxiv.org/abs/2605.10781)**, which reverses the teacher signal on correct rollouts so that the student's own reasoning is reinforced rather than overwritten. Beyond RLRT, this repository brings representative self-distillation methods together in one `verl`-based codebase — a shared base for studying how to use self-distillation well in single-turn reasoning.
 
-Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions). It offers fine-grained credit assignment while keeping a simple setup, and has recently gained attention.
+## News
 
+- [2026.10] 🔥 Unified release: `sdpo`, `srpo`, `rlsd`, and `rlrt` now live in a single codebase! See [Methods](#methods).
+- [2026.09] *Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR* accepted at NeurIPS 2026! 🎉🎉🎉 (also **Oral** at the COLM 2026 ER Workshop, and the NeurIPS 2026 Pre-to-Post Workshop) [[Paper](https://arxiv.org/abs/2605.10781)] [[Project Page](https://beanie00.github.io/self-distillation-analysis/rlrt/)]
+- [2026.07] *Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?* accepted at COLM 2026! 🎉🎉🎉 (also the COLM 2026 CBW Workshop) [[Paper](https://arxiv.org/abs/2603.24472)] [[Blog](https://beanie00.notion.site/why-does-self-distillation-degrade-reasoning)] [[Models](https://huggingface.co/collections/beanie00/self-distillation-analysis)] [[W&B](https://wandb.ai/beanie/SDPO-beanie/reports/Why-Does-Self-Distillation-Sometimes-Degrade-the-Reasoning-Capability-of-LLMs---VmlldzoxNjI1MTk5Mw?accessToken=i1ohtk0lbrcm63kkv1vd99f6jvb71sqoj32rgsokrs4l8r4vjz8q5mywtt8upwho)]
+- [2026.03] Code released and paper on self-distillation degradation released.
 
-⚠️  However, in the math domain, self-distillation can lead to **persistent performance degradation**, even when the training signal points in the right direction.
+## Methods
 
-We trace this to the suppression of **$\textcolor{#34B591}{epistemic\ verbalization}$**, the model's tendency to explicitly reason about its own uncertainty during problem-solving. Because the teacher is conditioned on richer context, it produces confident reasoning that *does not express uncertainty*. As the student imitates this behavior, it progressively loses the ability to express and leverage uncertainty, undermining exploratory reasoning.
+Each method is a `policy_loss.loss_mode` with its own config under `verl/trainer/config/`. All share a batch size of **256**, **8** rollouts per prompt, and a max response length of **20480**.
 
-📌 **Task Coverage Matters** -- With **$\textcolor{#DA7B99}{narrow\ coverage}$**, suppressing uncertainty shortens responses and boosts in-domain performance. But as coverage broadens, generalization suffers and OOD performance declines, suggesting that epistemic verbalization is important for robust reasoning, especially on unseen and challenging problems.
+**On-policy self-distillation (OPSD)** — the teacher determines the update direction.
+
+| `loss_mode` | Idea | Paper | Config |
+|---|---|---|---|
+| `sdpo` | Distillation loss against a teacher conditioned on the ground-truth solution. | [arXiv:2601.20802](https://arxiv.org/abs/2601.20802) | `sdpo.yaml` |
+| `srpo` | Routes samples: distillation loss on incorrect rollouts, GRPO on correct ones, with entropy-aware dynamic weighting. | [arXiv:2604.02288](https://arxiv.org/abs/2604.02288) | `srpo.yaml` |
+
+**Self-distilled RLVR** — the reward determines the update direction; the teacher only sets per-token magnitude.
+
+| `loss_mode` | Idea | Paper | Config |
+|---|---|---|---|
+| `rlsd` | GRPO advantages reweighted per token by the teacher/student likelihood ratio $(P_T/P_S)^{\text{sign}(A)}$. | [arXiv:2604.03128](https://arxiv.org/abs/2604.03128) | `rlsd.yaml` |
+| `rlrt` **(ours)** | Reverses that ratio on correct rollouts, reinforcing tokens the teacher would *not* have predicted. | [arXiv:2605.10781](https://arxiv.org/abs/2605.10781) | `rlrt.yaml` |
+
+RLRT outperforms the GRPO baseline early in training, and the gap widens and persists throughout training.
+
+![RLRT vs GRPO on Qwen3-4B-Base](figures/rlrt_vs_grpo.png)
 
 ## Installation
 
-For environment setup, please follow the [installation instructions in the SDPO README](https://github.com/lasgroup/SDPO/blob/main/README.md).
+For environment setup, run `setup.sh` (tested on NVIDIA B200, CUDA 12.8):
+
+```bash
+bash setup.sh
+source .venv/bin/activate
+```
+
+Set `WANDB_API_KEY` beforehand to log in. On other hardware, follow the [installation instructions in the SDPO README](https://github.com/lasgroup/SDPO/blob/main/README.md) instead.
 
 ### Data Preparation
 We primarily use the [DAPO-Math-17k](https://huggingface.co/datasets/BytedTsinghua-SIA/DAPO-Math-17k) dataset for training. You can download it by running:
@@ -29,7 +62,7 @@ We primarily use the [DAPO-Math-17k](https://huggingface.co/datasets/BytedTsingh
 bash experiments/math/prepare_dapo_data.sh
 ```
 
-The dataset for Section 6.2 (*"Relationship Between Task Coverage and Learning Performance"*) and the evaluation datasets are available in the `/data/math` directory.
+The evaluation datasets are available in `data/math/evaluation`.
 
 ### Prompt Reformatting
 The DAPO-Math-17k dataset prompts the model to produce answers in the `Answer:` format. The following script reformats these prompts to elicit `\boxed{}` answers instead. We found that this reformatting consistently improved the model's accuracy.
@@ -51,26 +84,69 @@ python experiments/math/change_math_prompts.py
 
 </details>
 
-
-### Configuration
-
-Below are the key hyperparameter differences from the default [SDPO](https://github.com/lasgroup/SDPO) settings:
-
-| Parameter | Value |
-|-----------|-------|
-| `train_batch_size` | 256 |
-| `ppo_mini_batch_size` | 128 or 64 (minimal difference) |
-| `max_prompt_length` | 2048 |
-| `max_response_length` | 20480 |
-| `max_reprompt_len` | 22528 |
-| `teacher_update_rate` | 0 (main) / 0.05 (ablation) |
-| `remove_thinking_from_demonstration` | `False` for SDPO ($c=s$) / `True` for SDPO ($c = s_{\setminus\text{think}}$) |
-
-Note: The original `remove_thinking_from_demonstration` implementation strips `<think>...</think>` from the student response. However, for models like DeepSeek-R1-Distill-7B, the chat template already includes an opening `<think>` tag in the prompt, so the student response begins without an opening `<think>` but still contains a closing `</think>`. We modified `_remove_thinking_trace` in `verl/trainer/ppo/ray_trainer.py` to handle this case.
-
 ## Run Examples
 
-### Analyzing Reasoning Behavior Under Richer Information (Section 3)
+### Training
+Before running training, you need to set up your environment variables:
+
+1. Copy the sample environment file:
+```bash
+   cp ".env sample.local" .env.local
+```
+2. Open `.env.local` and fill in your configuration values.
+
+Then launch any of the methods. Each script is named `run_math_<method>_<model>.sh`:
+
+```bash
+# GRPO baseline
+bash experiments/math/run_math_grpo_deepseek_r1_distill_7b.sh   # DeepSeek-R1-Distill-Qwen-7B
+bash experiments/math/run_math_grpo_qwen3_4b_base.sh            # Qwen3-4B-Base
+
+# On-policy self-distillation
+bash experiments/math/run_math_sdpo_deepseek_r1_distill_7b.sh   # DeepSeek-R1-Distill-Qwen-7B
+bash experiments/math/run_math_srpo_qwen3_8b_base.sh            # Qwen3-8B-Base
+
+# Self-distilled RLVR
+bash experiments/math/run_math_rlsd_qwen3_4b_base.sh            # Qwen3-4B-Base
+bash experiments/math/run_math_rlrt_qwen3_4b_base.sh            # Qwen3-4B-Base
+bash experiments/math/run_math_rlrt_qwen3_8b_base.sh            # Qwen3-8B-Base
+bash experiments/math/run_math_rlrt_qwen3_4b_instruct.sh        # Qwen3-4B-Instruct-2507
+bash experiments/math/run_math_rlrt_qwen3_8b_nothink.sh         # Qwen3-8B, thinking off
+```
+
+Every script reads its settings from the environment first, so GPUs, ports, and hyperparameters can be changed without editing the file. `CUDA_VISIBLE_DEVICES` follows `NUM_GPUS` unless you set it explicitly:
+
+```bash
+NUM_GPUS=4 RAY_PORT=6500 bash experiments/math/run_math_rlrt_qwen3_4b_base.sh
+```
+
+Pass `--dry-run` to print the resolved command without launching anything.
+
+All our training was conducted on B200 GPUs.
+
+### Evaluation
+After training, merge the saved FSDP checkpoints into HF format before running evaluation.
+```bash
+cd eval
+bash merge_models.sh
+bash eval.sh
+```
+
+<details>
+<summary><b>Reproducing <i>Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?</i></b></summary>
+
+**Released checkpoints.** Qwen3-8B (Thinking ON/OFF) and DeepSeek-Distill-7B are on
+[🤗 Hugging Face](https://huggingface.co/collections/beanie00/self-distillation-analysis).
+To evaluate them directly:
+
+```bash
+cd eval
+bash eval_examples.sh
+```
+
+**Reasoning behavior under richer information.** How the model's reasoning changes when it is
+given the solution as privileged context:
+
 ```bash
 cd analyzing_reasoning_behavior
 
@@ -84,64 +160,42 @@ bash eval_with_hint.sh
 bash make_report.sh
 ```
 
-The collected results are then used to construct the dataset for the SFT experiments in Section 4:
+The collected results build the dataset for the SFT experiments:
+
 ```bash
 bash make_sft_dataset.sh
 ```
 
-### GRPO and SDPO Training
-Before running training, you need to set up your environment variables:
-
-1. Copy the sample environment file:
-```bash
-   cp ".env sample.local" .env.local
-```
-2. Open `.env.local` and fill in your configuration values.
-
-To train with GRPO or SDPO on the full dataset, run:
-```bash
-bash experiments/math/run_math_grpo.sh
-bash experiments/math/run_math_sdpo.sh
-```
-
-For reproducing Section 6.2 (*"Relationship Between Task Coverage and Learning Performance"*) with a reduced question set, run:
-```bash
-bash experiments/math/run_math_grpo_small_question.sh
-bash experiments/math/run_math_sdpo_small_question.sh
-```
-
-All our training was conducted on 4B200 GPUs.
-
-### Evaluation
-After training, merge the saved FSDP checkpoints into HF format before running evaluation.
-```bash
-cd eval
-bash merge_models.sh
-bash eval.sh
-```
-
-Additionally, we release trained checkpoints for Qwen3-8B (Thinking ON/OFF) and DeepSeek-Distill-7B.
-👉 **[🤗 Hugging Face Collections](https://huggingface.co/collections/beanie00/self-distillation-analysis)**
-
-
-To quickly run an evaluation using our checkpoints:
+**Task coverage.** The reduced question sets are in `data/math/section_6_2`. To train on them:
 
 ```bash
-cd eval
-bash eval_examples.sh
+bash experiments/math/run_math_grpo_qwen3_8b_small_question.sh
+bash experiments/math/run_math_sdpo_qwen3_8b_small_question.sh
 ```
+
+</details>
 
 ## Citation
 If you find this work helpful, please consider citing it:
 ```bibtex
-@article{kim2026selfdistillation,
-  title={Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?},
-  author={Kim, Jeonghye and Luo, Xufang and Kim, Minbeom and Lee, Sangmook and Kim, Dohyung and Jeon, Jiwon and Li, Dongsheng and Yang, Yuqing},
-  journal={arXiv preprint arXiv:2603.24472},
+@inproceedings{kim2026why,
+  title={Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of {LLM}s?},
+  author={Jeonghye Kim and Xufang Luo and Minbeom Kim and Sangmook Lee and Dohyung Kim and Jiwon Jeon and Dongsheng Li and Yuqing Yang},
+  booktitle={Third Conference on Language Modeling},
   year={2026},
-  url={https://arxiv.org/abs/2603.24472}
+  url={https://openreview.net/forum?id=Az7guis46K}
+}
+
+@inproceedings{kim2026rebellious,
+  title={Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR},
+  author={Jeonghye Kim and Jiwon Jeon and Dongsheng Li and Yuqing Yang},
+  booktitle={The Fortieth Annual Conference on Neural Information Processing Systems},
+  year={2026},
+  url={https://arxiv.org/abs/2605.10781}
 }
 ```
 
 ## Attribution
-Our code is built upon [SDPO](https://github.com/lasgroup/SDPO). We thank the authors of SDPO for their great research and for open-sourcing their codebase!
+Our code is built upon [SDPO](https://github.com/lasgroup/SDPO), itself built on [veRL](https://github.com/volcengine/verl). We thank the authors of SDPO for their great research and for open-sourcing their codebase!
+
+The `srpo` and `rlsd` loss modes are our reimplementations of [SRPO](https://arxiv.org/abs/2604.02288) and [RLSD](https://arxiv.org/abs/2604.03128) respectively.

@@ -9,12 +9,11 @@ if [ -f "${PROJECT_ROOT}/.env.local" ]; then
     source "${PROJECT_ROOT}/.env.local"
     set -u
 fi
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-export EXPERIMENT="math-SDPO-Qwen3-8B-Think-Off-Small-Question-64"
+export EXPERIMENT="math-GRPO-Qwen3-8B-Think-Off-Small-Question-64"
 # Dataset — pick one
 export TASK="data/math"
 DATA_PATH="data/math"
-export RAY_PORT=6382
+export RAY_PORT=${RAY_PORT:-6381}
 
 DRY_RUN=false
 if [[ "${1:-}" == "--dry-run" ]]; then
@@ -25,10 +24,10 @@ fi
 # =============================================================================
 # PICK YOUR CONFIGURATION (edit these)
 # =============================================================================
-CONFIG_NAME="sdpo"
+CONFIG_NAME="baseline_grpo"
 
 # Model — pick one
-MODEL_PATH="Qwen/Qwen3-8B"
+MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-8B}"
 # MODEL_PATH="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
 # MODEL_PATH="allenai/Olmo-3-7B-Instruct"
 
@@ -36,15 +35,13 @@ MODEL_PATH="Qwen/Qwen3-8B"
 TRAIN_BATCH_SIZE=64
 ROLLOUT_BATCH_SIZE=8
 MINI_BATCH_SIZE=32
-LR=1e-5
-
-# SDPO-specific hyperparameters
-ALPHA=0.5                          # 0=forward KL, 0.5=Jensen-Shannon, 1=reverse KL
-DISTILLATION_TOPK=100              # Top-K logits for approximate distillation
-DONT_REPROMPT_ON_SELF_SUCCESS=True # Skip reprompting if sample itself succeeded
+LR=1e-6
 
 # GPU settings (adjust to your local machine)
-NUM_GPUS=4  # set to number of GPUs you have
+NUM_GPUS=${NUM_GPUS:-4}  # set to number of GPUs you have
+_VISIBLE_DEVICES=""
+for ((_i = 0; _i < NUM_GPUS; _i++)); do _VISIBLE_DEVICES+="${_VISIBLE_DEVICES:+,}$_i"; done
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-$_VISIBLE_DEVICES}
 
 # =============================================================================
 # SETUP
@@ -56,7 +53,7 @@ if [ -z "${WORKSPACE_DIR:-}" ]; then
 fi
 
 # Install dependencies (skip if already installed)
-if [[ "${SKIP_INSTALL:-false}" != "true" ]]; then
+if [[ "$DRY_RUN" != true && "${SKIP_INSTALL:-false}" != "true" ]]; then
     echo "Installing dependencies..."
     pip install word2number latex2sympy2 "math-verify[antlr4_9_3]==0.8.0"
     pip install -e "$WORKSPACE_DIR"
@@ -70,11 +67,13 @@ export PYTHONPATH="$WORKSPACE_DIR:${PYTHONPATH:-}"
 # =============================================================================
 EXP_NAME="${EXPERIMENT}-${MINI_BATCH_SIZE}-train${TRAIN_BATCH_SIZE}-rollout${ROLLOUT_BATCH_SIZE}-lr${LR}-model-${MODEL_PATH}"
 
-export RAY_TMPDIR="/tmp/ray_sdpo"
-mkdir -p "$RAY_TMPDIR"
-ray stop --force --temp-dir="$RAY_TMPDIR" 2>/dev/null || true
-mkdir -p "$RAY_TMPDIR"
-ray start --head --disable-usage-stats --port=$RAY_PORT --dashboard-port=8266 --temp-dir="$RAY_TMPDIR"
+export RAY_TMPDIR="/tmp/ray_grpo"
+if [ "$DRY_RUN" != true ]; then
+    mkdir -p "$RAY_TMPDIR"
+    ray stop --force --temp-dir="$RAY_TMPDIR" 2>/dev/null || true
+    mkdir -p "$RAY_TMPDIR"
+    ray start --head --disable-usage-stats --port=$RAY_PORT --dashboard-port=8265 --temp-dir="$RAY_TMPDIR"
+fi
 
 ARGS="data.train_batch_size=$TRAIN_BATCH_SIZE \
   data.train_files=[\"${WORKSPACE_DIR}/${TASK}/section_6_2/seen_64.parquet\"] \
@@ -86,11 +85,8 @@ ARGS="data.train_batch_size=$TRAIN_BATCH_SIZE \
   actor_rollout_ref.actor.ppo_mini_batch_size=$MINI_BATCH_SIZE \
   actor_rollout_ref.model.path=$MODEL_PATH \
   algorithm.rollout_correction.rollout_is=token \
-  actor_rollout_ref.actor.self_distillation.distillation_topk=$DISTILLATION_TOPK \
-  actor_rollout_ref.actor.self_distillation.dont_reprompt_on_self_success=$DONT_REPROMPT_ON_SELF_SUCCESS \
-  actor_rollout_ref.actor.self_distillation.alpha=$ALPHA \
-  actor_rollout_ref.actor.self_distillation.include_environment_feedback=False \
-  actor_rollout_ref.rollout.val_kwargs.n=1"
+  actor_rollout_ref.rollout.val_kwargs.n=1 \
+  trainer.n_gpus_per_node=$NUM_GPUS"
 
 # =============================================================================
 # RUN

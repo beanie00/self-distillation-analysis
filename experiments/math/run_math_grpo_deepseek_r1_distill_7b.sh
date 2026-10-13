@@ -12,12 +12,11 @@ if [ -f "${PROJECT_ROOT}/.env.local" ]; then
     source "${PROJECT_ROOT}/.env.local"
     set -u
 fi
-export CUDA_VISIBLE_DEVICES=0,1,2,3
 export EXPERIMENT="math-GRPO-DeepSeek-Qwen-7B"
 # Dataset — pick one
 export TASK="data/math"
 DATA_PATH="data/math"
-export RAY_PORT=6379
+export RAY_PORT=${RAY_PORT:-6379}
 
 DRY_RUN=false
 if [[ "${1:-}" == "--dry-run" ]]; then
@@ -32,7 +31,7 @@ CONFIG_NAME="baseline_grpo"
 
 # Model — pick one
 # MODEL_PATH="Qwen/Qwen3-8B"
-MODEL_PATH="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+MODEL_PATH="${MODEL_PATH:-deepseek-ai/DeepSeek-R1-Distill-Qwen-7B}"
 # MODEL_PATH="allenai/Olmo-3-7B-Instruct"
 
 # Hyperparameters
@@ -42,7 +41,10 @@ MINI_BATCH_SIZE=128
 LR=1e-6
 
 # GPU settings (adjust to your local machine)
-NUM_GPUS=4  # set to number of GPUs you have
+NUM_GPUS=${NUM_GPUS:-4}  # set to number of GPUs you have
+_VISIBLE_DEVICES=""
+for ((_i = 0; _i < NUM_GPUS; _i++)); do _VISIBLE_DEVICES+="${_VISIBLE_DEVICES:+,}$_i"; done
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-$_VISIBLE_DEVICES}
 
 # =============================================================================
 # SETUP
@@ -54,7 +56,7 @@ if [ -z "${WORKSPACE_DIR:-}" ]; then
 fi
 
 # Install dependencies (skip if already installed)
-if [[ "${SKIP_INSTALL:-false}" != "true" ]]; then
+if [[ "$DRY_RUN" != true && "${SKIP_INSTALL:-false}" != "true" ]]; then
     echo "Installing dependencies..."
     pip install word2number latex2sympy2 "math-verify[antlr4_9_3]==0.8.0"
     pip install -e "$WORKSPACE_DIR"
@@ -69,10 +71,12 @@ export PYTHONPATH="$WORKSPACE_DIR:${PYTHONPATH:-}"
 EXP_NAME="${EXPERIMENT}-${MINI_BATCH_SIZE}-train${TRAIN_BATCH_SIZE}-rollout${ROLLOUT_BATCH_SIZE}-lr${LR}-model${MODEL_PATH}"
 
 export RAY_TMPDIR="/tmp/ray_grpo"
-mkdir -p "$RAY_TMPDIR"
-ray stop --force --temp-dir="$RAY_TMPDIR" 2>/dev/null || true
-mkdir -p "$RAY_TMPDIR"
-ray start --head --disable-usage-stats --port=$RAY_PORT --dashboard-port=8265 --temp-dir="$RAY_TMPDIR"
+if [ "$DRY_RUN" != true ]; then
+    mkdir -p "$RAY_TMPDIR"
+    ray stop --force --temp-dir="$RAY_TMPDIR" 2>/dev/null || true
+    mkdir -p "$RAY_TMPDIR"
+    ray start --head --disable-usage-stats --port=$RAY_PORT --dashboard-port=8265 --temp-dir="$RAY_TMPDIR"
+fi
 
 ARGS="data.train_batch_size=$TRAIN_BATCH_SIZE \
   trainer.group_name=GRPO-generalization \
@@ -82,7 +86,8 @@ ARGS="data.train_batch_size=$TRAIN_BATCH_SIZE \
   actor_rollout_ref.actor.ppo_mini_batch_size=$MINI_BATCH_SIZE \
   actor_rollout_ref.model.path=$MODEL_PATH \
   algorithm.rollout_correction.rollout_is=token \
-  actor_rollout_ref.rollout.val_kwargs.n=1"
+  actor_rollout_ref.rollout.val_kwargs.n=1 \
+  trainer.n_gpus_per_node=$NUM_GPUS"
 
 # =============================================================================
 # RUN

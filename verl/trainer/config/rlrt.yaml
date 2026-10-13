@@ -1,0 +1,46 @@
+defaults:
+  - ppo_trainer
+  - user
+  - _self_
+
+# RLRT: token-level reweighting is applied ONLY to correct trajectories
+# (A > 0).  Incorrect trajectories receive vanilla GRPO penalties — no
+# teacher-based modulation.
+max_model_len: 10240
+
+actor_rollout_ref:
+  actor:
+    ppo_mini_batch_size: 128
+    policy_loss:
+      loss_mode: rlrt
+    self_distillation:
+      full_logit_distillation: False
+      distillation_topk: null
+      epsilon_w: 1.0
+      rlsd_lambda_init: 0.5
+      rlsd_lambda_decay_steps: 200
+      max_reprompt_len: 22528
+      dont_reprompt_on_self_success: False
+      include_environment_feedback: False
+      reweight_correct_only: True
+    optim:
+      lr: 1e-6
+      lr_warmup_steps: 10
+  rollout:
+    n: 8
+    calculate_log_probs: True
+    val_kwargs:
+      n: 1
+
+algorithm:
+  adv_estimator: grpo
+  norm_adv_by_std_in_grpo: True
+  rollout_correction:
+    rollout_is: token
+    rollout_is_threshold: 2.0
+
+data:
+  train_batch_size: 256
+
+trainer:
+  val_before_train: False

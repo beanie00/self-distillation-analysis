@@ -30,7 +30,7 @@ do
     echo "=================================================================="
     echo ""
 
-    CUDA_VISIBLE_DEVICES=0,1,2,3 python eval.py \
+    CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2,3} python eval.py \
         --model_name_or_path ${model} \
         --data_path ../data/math/evaluation/aime24.parquet \
         --max_tokens 38912 \

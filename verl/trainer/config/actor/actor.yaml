@@ -127,6 +127,26 @@ self_distillation:
   # IS clip for loss; null disables IS weighting
   is_clip: 2
 
+  # ── RLSD-specific fields ──────────────────────────────────────────────────
+  # Clipping bound ε_w for the token-level evidence weight in RLSD (paper §4.1).
+  # w_t is clipped to [1-ε_w, 1+ε_w] before scaling the advantage.
+  epsilon_w: 0.2
+
+  # Initial value of the mixing coefficient λ (paper Algorithm 1, line 17).
+  # λ interpolates between uniform GRPO advantage (λ=0) and full RLSD reweighting (λ=1).
+  rlsd_lambda_init: 0.5
+
+  # Number of training steps over which λ decays linearly from rlsd_lambda_init to 0.
+  # After this many steps RLSD falls back to vanilla GRPO.
+  rlsd_lambda_decay_steps: 50
+
+  # Jinja-style template used to inject the ground-truth answer into the teacher prompt.
+  # Available variables: {prompt}, {ground_truth}.
+  rlsd_template: |-
+    {prompt}
+
+    The correct answer is: {ground_truth}
+
   # Reprompting template - available variables: prompt, successful_previous_attempt, feedback
   reprompt_template: |-
     {prompt}{solution}{feedback}
