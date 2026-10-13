@@ -12,7 +12,7 @@
 
 </div>
 
-Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions), giving fine-grained credit assignment with a simple setup. In math reasoning, however, imitating the teacher's confident reasoning suppresses the student's own expression of uncertainty and degrades it (*[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)*).
+Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions), giving fine-grained credit assignment with a simple setup. In math reasoning, however, imitating the teacher's confident reasoning suppresses the student's own expression of uncertainty and degrades it ([COLM 2026](https://arxiv.org/abs/2603.24472)).
 
 Our answer is **[RLRT](https://arxiv.org/abs/2605.10781)**, which reverses the teacher signal on correct rollouts so that the student's own reasoning is reinforced rather than overwritten. Beyond RLRT, this repository brings representative self-distillation methods together in one `verl`-based codebase — a shared base for studying how to use self-distillation well in single-turn reasoning.
 
@@ -58,7 +58,7 @@ We primarily use the [DAPO-Math-17k](https://huggingface.co/datasets/BytedTsingh
 bash experiments/math/prepare_dapo_data.sh
 ```
 
-The evaluation datasets are available in `data/math/evaluation`. The task-coverage splits used in *[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)* are in `data/math/section_6_2`.
+The evaluation datasets are available in `data/math/evaluation`.
 
 ### Prompt Reformatting
 The DAPO-Math-17k dataset prompts the model to produce answers in the `Answer:` format. The following script reformats these prompts to elicit `\boxed{}` answers instead. We found that this reformatting consistently improved the model's accuracy.
@@ -81,28 +81,6 @@ python experiments/math/change_math_prompts.py
 </details>
 
 ## Run Examples
-
-### Analyzing Reasoning Behavior Under Richer Information
-
-Reproduces the behavioral analysis from *[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)*: how the model's reasoning changes when it is given the solution as privileged context.
-
-```bash
-cd analyzing_reasoning_behavior
-
-# Collect 100 questions from DAPO-Math-17k where the base model solves at a rate between 0.125 and 0.5, along with their solutions
-bash eval_dapo_dataset.sh
-
-# Re-evaluate the model with solutions provided as hints
-bash eval_with_hint.sh
-
-# Generate a summary report
-bash make_report.sh
-```
-
-The collected results are then used to construct the dataset for that paper's SFT experiments:
-```bash
-bash make_sft_dataset.sh
-```
 
 ### Training
 Before running training, you need to set up your environment variables:
@@ -150,12 +128,48 @@ bash merge_models.sh
 bash eval.sh
 ```
 
-We release the trained checkpoints from *[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)* — Qwen3-8B (Thinking ON/OFF) and DeepSeek-Distill-7B — on [🤗 Hugging Face](https://huggingface.co/collections/beanie00/self-distillation-analysis). To evaluate them directly:
+<details>
+<summary><b>Reproducing <i>Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?</i></b></summary>
+
+**Released checkpoints.** Qwen3-8B (Thinking ON/OFF) and DeepSeek-Distill-7B are on
+[🤗 Hugging Face](https://huggingface.co/collections/beanie00/self-distillation-analysis).
+To evaluate them directly:
 
 ```bash
 cd eval
 bash eval_examples.sh
 ```
+
+**Reasoning behavior under richer information.** How the model's reasoning changes when it is
+given the solution as privileged context:
+
+```bash
+cd analyzing_reasoning_behavior
+
+# Collect 100 questions from DAPO-Math-17k where the base model solves at a rate between 0.125 and 0.5, along with their solutions
+bash eval_dapo_dataset.sh
+
+# Re-evaluate the model with solutions provided as hints
+bash eval_with_hint.sh
+
+# Generate a summary report
+bash make_report.sh
+```
+
+The collected results build the dataset for the SFT experiments:
+
+```bash
+bash make_sft_dataset.sh
+```
+
+**Task coverage.** The reduced question sets are in `data/math/section_6_2`. To train on them:
+
+```bash
+bash experiments/math/run_math_grpo_qwen3_8b_small_question.sh
+bash experiments/math/run_math_sdpo_qwen3_8b_small_question.sh
+```
+
+</details>
 
 ## Citation
 If you find this work helpful, please consider citing it:
