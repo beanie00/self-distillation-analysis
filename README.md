@@ -12,20 +12,20 @@
 
 </div>
 
-Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions), giving fine-grained credit assignment with a simple setup. In math reasoning, however, imitating the teacher's confident reasoning suppresses the student's own expression of uncertainty and degrades it ([COLM 2026](https://arxiv.org/abs/2603.24472)).
+Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions), giving fine-grained credit assignment with a simple setup. In single-turn reasoning (like math), however, imitating the teacher's confident reasoning suppresses the student's own expression of uncertainty and degrades it ([COLM 2026](https://arxiv.org/abs/2603.24472)).
 
 Our answer is **[RLRT](https://arxiv.org/abs/2605.10781)**, which reverses the teacher signal on correct rollouts so that the student's own reasoning is reinforced rather than overwritten. Beyond RLRT, this repository brings representative self-distillation methods together in one `verl`-based codebase — a shared base for studying how to use self-distillation well in single-turn reasoning.
 
 ## News
 
 - [2026.10] 🔥 Unified release: `sdpo`, `srpo`, `rlsd`, and `rlrt` now live in a single codebase! See [Methods](#methods).
-- [2026.09] *Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR* accepted at NeurIPS 2026! 🎉🎉🎉 [[Paper](https://arxiv.org/abs/2605.10781)] [[Project Page](https://beanie00.github.io/self-distillation-analysis/rlrt/)]
-- [2026.07] *Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?* accepted at COLM 2026! 🎉🎉🎉 [[Paper](https://arxiv.org/abs/2603.24472)] [[Blog](https://beanie00.notion.site/why-does-self-distillation-degrade-reasoning)] [[Models](https://huggingface.co/collections/beanie00/self-distillation-analysis)] [[W&B](https://wandb.ai/beanie/SDPO-beanie/reports/Why-Does-Self-Distillation-Sometimes-Degrade-the-Reasoning-Capability-of-LLMs---VmlldzoxNjI1MTk5Mw?accessToken=i1ohtk0lbrcm63kkv1vd99f6jvb71sqoj32rgsokrs4l8r4vjz8q5mywtt8upwho)]
+- [2026.09] *Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR* accepted at NeurIPS 2026! 🎉🎉🎉 (also **Oral** at the COLM 2026 ER Workshop, and the NeurIPS 2026 Pre-to-Post Workshop) [[Paper](https://arxiv.org/abs/2605.10781)] [[Project Page](https://beanie00.github.io/self-distillation-analysis/rlrt/)]
+- [2026.07] *Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?* accepted at COLM 2026! 🎉🎉🎉 (also the COLM 2026 CBW Workshop) [[Paper](https://arxiv.org/abs/2603.24472)] [[Blog](https://beanie00.notion.site/why-does-self-distillation-degrade-reasoning)] [[Models](https://huggingface.co/collections/beanie00/self-distillation-analysis)] [[W&B](https://wandb.ai/beanie/SDPO-beanie/reports/Why-Does-Self-Distillation-Sometimes-Degrade-the-Reasoning-Capability-of-LLMs---VmlldzoxNjI1MTk5Mw?accessToken=i1ohtk0lbrcm63kkv1vd99f6jvb71sqoj32rgsokrs4l8r4vjz8q5mywtt8upwho)]
 - [2026.03] Code released and paper on self-distillation degradation released.
 
 ## Methods
 
-Each method is a `policy_loss.loss_mode` with its own config under `verl/trainer/config/`.
+Each method is a `policy_loss.loss_mode` with its own config under `verl/trainer/config/`. All share a batch size of **256**, **8** rollouts per prompt, and a max response length of **20480**.
 
 **On-policy self-distillation (OPSD)** — the teacher determines the update direction.
 
@@ -40,6 +40,10 @@ Each method is a `policy_loss.loss_mode` with its own config under `verl/trainer
 |---|---|---|---|
 | `rlsd` | GRPO advantages reweighted per token by the teacher/student likelihood ratio $(P_T/P_S)^{\text{sign}(A)}$. | [arXiv:2604.03128](https://arxiv.org/abs/2604.03128) | `rlsd.yaml` |
 | `rlrt` **(ours)** | Reverses that ratio on correct rollouts, reinforcing tokens the teacher would *not* have predicted. | [arXiv:2605.10781](https://arxiv.org/abs/2605.10781) | `rlrt.yaml` |
+
+RLRT outperforms the GRPO baseline early in training, and the gap widens and persists throughout training.
+
+![RLRT vs GRPO on Qwen3-4B-Base](figures/rlrt_vs_grpo.png)
 
 ## Installation
 
@@ -174,18 +178,18 @@ bash experiments/math/run_math_sdpo_qwen3_8b_small_question.sh
 ## Citation
 If you find this work helpful, please consider citing it:
 ```bibtex
-@article{kim2026selfdistillation,
-  title={Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?},
-  author={Kim, Jeonghye and Luo, Xufang and Kim, Minbeom and Lee, Sangmook and Kim, Dohyung and Jeon, Jiwon and Li, Dongsheng and Yang, Yuqing},
-  journal={arXiv preprint arXiv:2603.24472},
+@inproceedings{kim2026why,
+  title={Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of {LLM}s?},
+  author={Jeonghye Kim and Xufang Luo and Minbeom Kim and Sangmook Lee and Dohyung Kim and Jiwon Jeon and Dongsheng Li and Yuqing Yang},
+  booktitle={Third Conference on Language Modeling},
   year={2026},
-  url={https://arxiv.org/abs/2603.24472}
+  url={https://openreview.net/forum?id=Az7guis46K}
 }
 
-@article{kim2026rebellious,
+@inproceedings{kim2026rebellious,
   title={Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR},
-  author={Kim, Jeonghye and Jeon, Jiwon and Li, Dongsheng and Yang, Yuqing},
-  journal={arXiv preprint arXiv:2605.10781},
+  author={Jeonghye Kim and Jiwon Jeon and Dongsheng Li and Yuqing Yang},
+  booktitle={The Fortieth Annual Conference on Neural Information Processing Systems},
   year={2026},
   url={https://arxiv.org/abs/2605.10781}
 }
