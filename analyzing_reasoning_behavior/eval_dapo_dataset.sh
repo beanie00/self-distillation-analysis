@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=0,1,2,3 python eval_dapo_dataset.py \
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2,3} python eval_dapo_dataset.py \
     --model_name_or_path deepseek-ai/DeepSeek-R1-Distill-Qwen-7B \
     --enable_thinking \
     --data_path ../data/math/train.parquet \
