@@ -30,7 +30,8 @@
   <meta property="article:tag" content="LLM reasoning">
 
   <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image"> 
+  <meta name="twitter:card" content="summary_large_image">
+ 
   <meta name="twitter:site" content="@beanie0__0">
   <meta name="twitter:creator" content="@beanie0__0">
   <meta name="twitter:title" content="Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR">
@@ -49,8 +50,8 @@
   <meta name="citation_pdf_url" content="https://arxiv.org/pdf/2605.10781">
   
   <!-- Additional SEO -->
-  <meta name="theme-color" content="#2563eb">
-  <meta name="msapplication-TileColor" content="#2563eb">
+  <meta name="theme-color" content="#1e6b52">
+  <meta name="msapplication-TileColor" content="#1e6b52">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   
@@ -189,27 +190,11 @@
         </button>
       </div>
       <div class="works-list">
-        <a href="https://arxiv.org/abs/2604.03128" class="work-item" target="_blank">
-          <div class="work-info">
-            <h5>Self-Distilled RLVR (RLSD)</h5>
-            <p>Reward-gated self-distillation where the teacher modulates only update magnitude — the closest comparison point to RLRT.</p>
-            <span class="work-venue">arXiv 2026</span>
-          </div>
-          <i class="fas fa-external-link-alt"></i>
-        </a>
         <a href="https://arxiv.org/abs/2603.24472" class="work-item" target="_blank">
           <div class="work-info">
             <h5>Why Does Self-Distillation (Sometimes) Degrade Reasoning?</h5>
             <p>Analysis revealing that self-distillation can suppress reflective tokens essential for robust reasoning — a key motivation for RLRT.</p>
-            <span class="work-venue">arXiv 2026</span>
-          </div>
-          <i class="fas fa-external-link-alt"></i>
-        </a>
-        <a href="https://arxiv.org/abs/2604.02288" class="work-item" target="_blank">
-          <div class="work-info">
-            <h5>SRPO: Unifying Group-Relative and Self-Distillation</h5>
-            <p>Routes correct rollouts to GRPO and incorrect ones to self-distillation — identifying "optimization ambiguity" in self-distillation.</p>
-            <span class="work-venue">arXiv 2026</span>
+            <span class="work-venue">COLM 2026</span>
           </div>
           <i class="fas fa-external-link-alt"></i>
         </a>
@@ -239,10 +224,12 @@
             <div class="is-size-5 publication-authors">
               <span class="author-block"><sup>1</sup>Microsoft Research &nbsp;&nbsp; <sup>2</sup>KAIST</span>
               <br>
-              <span class="author-block">NeurIPS 2026</span>
+              <span class="author-block" style="display:inline-block; margin-top:0.4rem;">NeurIPS 2026</span>
               <br>
               <span class="eql-cntrb">
-                <small><sup>*</sup>Equal contribution &nbsp;&nbsp; <sup>&diams;</sup>Work done during an internship at Microsoft Research &nbsp;&nbsp; <sup>&dagger;</sup>Corresponding author</small>
+                <small><sup>*</sup>Equal contribution &nbsp;&nbsp; <sup>&dagger;</sup>Corresponding author</small>
+                <br>
+                <small><sup>&diams;</sup>Work done during an internship at Microsoft Research</small>
               </span>
             </div>
 
@@ -255,9 +242,7 @@
                   <span>Paper</span>
                   </a>
                 </span>
-                  <span>Supplementary</span>
-                  </a>
-                </span>
+
                 <span class="link-block">
                   <a href="https://github.com/beanie00/self-distillation-analysis" target="_blank"
                   class="external-link button is-normal is-rounded is-dark">
@@ -282,7 +267,8 @@
           <p class="is-size-4 has-text-weight-bold" style="color:#1e6b52; margin-bottom: 0.5rem;">RLRT is an LLM post-training method that teaches models how to think independently.</p>
           <p class="is-size-5">Encouraging the model <strong>to think differently from the teacher's guidance</strong><br class="is-hidden-mobile"> while still getting the right answer leads to better reasoning.</p>
         </div>
-        <img src="static/images/rlrt_concept.png" alt="The teacher tells the student to stop exploring; the student tries other methods and succeeds" style="width: 100%;">
+        <img class="fig fig-65" src="static/images/rlrt_concept.png" alt="The teacher tells the student to stop exploring; the student tries other methods and succeeds">
+        <p class="concept-note">In the end, for humans and AI alike, what really matters is learning <strong>how to think</strong>, beyond just memorizing known solutions. When facing a new problem, it&rsquo;s how well you think that makes the difference.</p>
       </div>
     </div>
   </section>
@@ -294,10 +280,10 @@
       <h2 class="title is-3 has-text-centered">Reversing the Teacher Signal</h2>
       <div class="content has-text-justified">
         <p>
-          Self-distillation trains a model (the <em>student</em>) to imitate a copy of itself that has already seen the answer (the <em>teacher</em>). A teacher that knows the answer has no reason to hesitate, so the student learns to drop words like <em>wait</em> and <em>maybe</em> and stops exploring. We flip the signal: on correct answers, we reward <strong>self-driven tokens</strong>, the choices the student made against the teacher's prediction that still led to the right answer.
+          In self-distillation, a single model plays both roles: the <em>student</em> sees only the question, while the <em>teacher</em> also sees a privileged context &mdash; the ground-truth solution or a successful rollout. A teacher that already knows the answer has no reason to hesitate, so a student trained toward it drops words like <em>wait</em> and <em>maybe</em> and stops exploring. We flip the signal: on correct answers, we reward <strong>self-driven tokens</strong>, the choices the student made against the teacher's prediction that still led to the right answer.
         </p>
       </div>
-      <div class="columns">
+      <div class="columns fig-pair">
         <div class="column" style="flex: 2.19 1 0;">
           <img src="static/images/self_driven_curve.png" alt="Training score when upweighting teacher-predicted vs. self-driven tokens" style="width: 100%;">
           <p class="has-text-centered">Upweighting <strong style="color:#1e8a5f">self-driven tokens</strong> during GRPO significantly improves training efficiency, while upweighting <strong style="color:#c2185b">teacher-predicted tokens</strong> hurts it.</p>
@@ -315,11 +301,13 @@
   <section class="section">
     <div class="container is-max-desktop">
       <h2 class="title is-3 has-text-centered">RLRT: RLVR with Reversed Teacher</h2>
-      <img src="static/images/RLRT.png" alt="RLRT training pipeline" style="display: block; width: 100%; margin-bottom: 1.5rem;">
       <div class="content has-text-justified">
         <p>
-          RLRT changes only how GRPO assigns credit to tokens. The teacher sees a successful rollout; the student does not. Each token gets a reverse weight \(w_t = P_S(y_t) / P_T(y_t)\) on correct rollouts, where \(P_S\) and \(P_T\) are the student and teacher token probabilities.
+          RLRT is a simple modification to GRPO: it changes only how credit is assigned to tokens. The setup is the usual self-distillation one &mdash; the teacher sees a successful rollout that the student does not &mdash; but instead of pulling the student toward the teacher, we invert the ratio. On correct rollouts each token is weighted by \(w_t = P_S(y_t) / P_T(y_t)\), so tokens the student preferred over the teacher are amplified, where \(P_S\) and \(P_T\) are the student and teacher token probabilities.
         </p>
+      </div>
+      <img class="fig fig-78" src="static/images/RLRT.png" alt="RLRT training pipeline" style="margin: 0.5rem auto 1.5rem;">
+      <div class="content has-text-justified">
         \[
           A_t^{\mathrm{RLRT}} = \begin{cases}
             A \cdot \bigl[(1-\lambda) + \lambda\cdot\mathrm{clip}(w_t,\, 1-\varepsilon_w,\, 1+\varepsilon_w)\bigr] & \text{if } r = 1, \\
@@ -327,8 +315,11 @@
           \end{cases}
         \]
         <p class="has-text-centered"><small>\(A\): GRPO advantage; \(r\): correctness; \(\lambda\) sets the weighting strength (\(\lambda = 0\) is GRPO); \(\varepsilon_w\) bounds the clipped weight.</small></p>
-        <p class="has-text-centered" style="color:#1e6b52; font-weight: 600;">
+        <p class="has-text-centered is-size-5" style="color:#1e6b52; font-weight: 600;">
           Correct rollouts: amplify self-driven tokens (\(P_S &gt; P_T\)). Incorrect rollouts: keep GRPO.
+        </p>
+        <p class="takeaway-note">
+          So if the student thought differently from the teacher and still got it right, it found a new path on its own &mdash; and we reinforce that even more. This acts as an important <strong>exploration signal</strong> in RLVR.
         </p>
       </div>
     </div>
@@ -344,8 +335,13 @@
           We train on DAPO-Math-17k with four Qwen3 backbones and evaluate on six math benchmarks (AIME24/25/26, HMMT26, AMC23, MATH500). RLRT trains faster and outperforms GRPO and self-distillation baselines on all four backbones, by <strong>up to 18%</strong>.
         </p>
       </div>
-      <img src="static/images/training_curves.png" alt="Training score curves on four Qwen3 backbones" style="display: block; width: 100%; margin-bottom: 1.5rem;">
-      <img src="static/images/benchmark_bars.png" alt="Mean avg@16 across six math benchmarks" style="display: block; width: 100%;">
+      <img class="fig" src="static/images/training_curves.png" alt="Training score curves on four Qwen3 backbones" style="margin-bottom: 1.5rem;">
+      <img class="fig fig-58" src="static/images/benchmark_bars.png" alt="Mean avg@16 across six math benchmarks">
+      <div class="content has-text-justified" style="margin-top: 1.25rem;">
+        <p>
+          The gap is largest on the base models: they have more room to explore, and that is where RLRT&rsquo;s exploration signal helps most.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -354,20 +350,32 @@
   <section class="section">
     <div class="container is-max-desktop">
       <h2 class="title is-3 has-text-centered">RLRT Expands Reasoning Beyond the Base Policy</h2>
-      <img src="static/images/distribution_shift.png" alt="JS divergence CCDF and base probability of new top-1 tokens" style="display: block; width: 100%; margin-bottom: 1rem;">
-      <div class="columns">
-        <div class="column">
-          <p><strong style="color:#1e6b52">(a) More positions change.</strong> Higher curve = more changed positions. RLRT changes the next-token distribution at more positions than GRPO or RLSD.</p>
+        <div class="content has-text-justified">
+          <p>
+            On hard prompts, we measure how far each fine-tuned policy&rsquo;s next-token distribution moves from that of the base policy, and label a token position as <em>high-divergence</em> when the Jensen&ndash;Shannon divergence exceeds 0.1. At these positions, GRPO and RLSD mostly sharpen tokens the base model already prefers, whereas RLRT reorganizes the set of top candidate tokens itself.
+          </p>
         </div>
-        <div class="column">
-          <p><strong style="color:#1e6b52">(b) Rare tokens become top-1.</strong> Tokens with base probability &lt;0.001 become the most likely next token over 10× as often with RLRT as with GRPO or RLSD.</p>
-        </div>
+      <!-- Distribution shift (two panels), then the pass@k comparison on its own row -->
+      <img class="fig fig-72" src="static/images/distribution_shift.png" alt="JS divergence CCDF and base probability of new top-1 tokens">
+      <div class="fig-row fig-captions fig-subcaptions">
+        <p><strong style="color:#1e6b52">(a) More positions change.</strong> Higher curve = more changed positions. RLRT changes the next-token distribution at more positions than GRPO or RLSD.</p>
+        <p><strong style="color:#1e6b52">(b) Rare tokens become top-1.</strong> Tokens with base probability &lt;0.001 become the most likely next token over 10× as often with RLRT as with GRPO or RLSD.</p>
       </div>
-      <img src="static/images/pass_at_k.png" alt="pass@k comparison with exploration baselines on AIME24 and AIME26" style="display: block; width: 75%; margin: 1.5rem auto 1rem auto;">
-      <p class="has-text-centered">
-        <strong style="color:#1e6b52">(c) Outperforms exploration baselines.</strong> On Qwen3-8B-Base, RLRT leads <strong>from pass@1 to pass@256</strong> on AIME24 and AIME26.<br>
-        <small>GRPO+EB: entropy bonus (token-level exploration). DIVER: sequence-level diversity.</small>
-      </p>
+
+      </div>
+    </section>
+
+  <!-- Comparison with other exploration methods -->
+  <section class="section hero is-light">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Comparison with Other Exploration Methods</h2>
+        <div class="content has-text-justified">
+          <p>
+            We compare RLRT against two representative exploration methods: GRPO with an entropy bonus (<strong>GRPO+EB</strong>) for token-level entropy regulation, and <strong>DIVER</strong> for sequence-level diversity, using pass@k for k &isin; {1, 2, &hellip;, 256} on Qwen3-8B-Base.
+          </p>
+        </div>
+        <img class="fig fig-45" src="static/images/pass_at_k.png" alt="pass@k comparison with exploration baselines on AIME24 and AIME26">
+      <p class="fig-caption-single"><strong style="color:#1e6b52">Outperforms exploration baselines.</strong> On Qwen3-8B-Base, RLRT leads <strong>from pass@1 to pass@256</strong> on AIME24 and AIME26.</p>
     </div>
   </section>
   <!-- BibTeX -->
@@ -380,11 +388,12 @@
           <span class="copy-text">Copy</span>
         </button>
       </div>
-      <pre id="bibtex-code"><code>@inproceedings{kim2026rlrt,
+      <pre id="bibtex-code"><code>@inproceedings{kim2026rebellious,
   title     = {Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR},
-  author    = {Kim, Jeonghye and Jeon, Jiwon and Li, Dongsheng and Yang, Yuqing},
-  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
-  year      = {2026}
+  author    = {Jeonghye Kim and Jiwon Jeon and Dongsheng Li and Yuqing Yang},
+  booktitle = {The Fortieth Annual Conference on Neural Information Processing Systems},
+  year      = {2026},
+  url       = {https://arxiv.org/abs/2605.10781}
 }</code></pre>
     </div>
   </section>

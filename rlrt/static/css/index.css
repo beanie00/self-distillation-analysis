@@ -1,9 +1,9 @@
 /* Modern CSS Variables for consistent theming */
 :root {
-  --primary-color: #2563eb;
-  --primary-hover: #1d4ed8;
+  --primary-color: #1e6b52;
+  --primary-hover: #185843;
   --secondary-color: #64748b;
-  --accent-color: #0ea5e9;
+  --accent-color: #1e8a5f;
   --text-primary: #1e293b;
   --text-secondary: #64748b;
   --text-light: #94a3b8;
@@ -104,7 +104,7 @@ body {
 }
 
 .teaser .hero-body {
-  padding-top: 2rem;
+  padding-top: 0.5rem;
   padding-bottom: 4rem;
 }
 
@@ -142,13 +142,13 @@ body {
 }
 
 .publication-header .hero-body {
-  padding: 6rem 1.5rem 4rem;
+  padding: 6rem 1.5rem 1.5rem;
 }
 
 .publication-authors {
     font-family: 'Inter', sans-serif !important;
     font-weight: 500;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .publication-venue {
@@ -302,10 +302,17 @@ body {
   transform: scale(1.2);
 }
 
+/* Pull the Paper/Code buttons closer to the footnotes above them */
+.publication-links {
+  margin-top: 0;
+}
+
 .eql-cntrb { 
+  display: inline-block;
   font-size: 0.875rem;
   color: var(--text-light);
   font-style: italic;
+  line-height: 1.25;
 }
 
 /* Section Titles */
@@ -605,7 +612,7 @@ code {
   }
   
   .publication-header .hero-body {
-    padding: 3rem 1rem 2rem;
+    padding: 3rem 1rem 1rem;
   }
   
   .publication-title {
@@ -703,7 +710,7 @@ code {
   }
   
   .publication-header .hero-body {
-    padding: 4rem 2rem 3rem;
+    padding: 4rem 2rem 1rem;
   }
 }
 
@@ -773,4 +780,78 @@ a:focus {
 p.has-text-centered,
 .column > p {
   text-wrap: balance;
+}
+
+/* ---- Figure sizing ----
+   Each figure is scaled so its in-figure text roughly matches the
+   "Reversing the Teacher Signal" plots. Percentages are relative to the
+   content column, so ratios stay consistent at every desktop width. */
+.fig {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-left: auto;
+  margin-right: auto;
+}
+.fig-78 { width: 78%; }
+.fig-75 { width: 75%; }
+.fig-65 { width: 65%; }
+.fig-58 { width: 58%; }
+.fig-72 { width: 72%; }
+.fig-45 { width: 45%; }
+
+/* Side-by-side figures: images bottom-aligned, captions in a matching row */
+.fig-row { display: flex; gap: 3rem; align-items: flex-end; }
+.fig-captions { align-items: flex-start; margin-top: 0.75rem; font-size: 1rem; }
+.fig-subcaptions { gap: 1rem; align-items: flex-start; }
+.fig-subcaptions > p { flex: 1 1 0; }
+
+@media screen and (max-width: 768px) {
+  .fig-row { flex-direction: column; align-items: stretch; }
+  .fig-row > * { flex: none !important; }
+  .fig-78, .fig-75, .fig-72, .fig-65, .fig-58, .fig-45 { width: 100%; }
+}
+
+/* Figures in gray (.hero.is-light) sections: blend their white
+   backgrounds into the section gray instead of showing white boxes. */
+.hero.is-light img {
+  mix-blend-mode: multiply;
+}
+
+/* Wider gap between the two "Reversing the Teacher Signal" figures
+   (Bulma default is 1.5rem); outer edges stay aligned with the text. */
+@media screen and (min-width: 769px) {
+  .columns.fig-pair { margin-left: -1.5rem; margin-right: -1.5rem; }
+  .columns.fig-pair > .column { padding-left: 1.5rem; padding-right: 1.5rem; }
+}
+/* Same caption size as the Beyond the Base Policy captions; fits the
+   left caption on two lines. */
+.columns.fig-pair .column > p { font-size: 1rem; }
+
+/* Caption for a figure that sits on its own row */
+.fig-caption-single {
+  max-width: 72%;
+  margin: 0.75rem auto 0;
+  font-size: 1rem;
+}
+@media screen and (max-width: 768px) {
+  .fig-caption-single { max-width: 100%; }
+}
+
+/* Closing note under the concept figure */
+.concept-note {
+  max-width: 44rem;
+  margin: 1.25rem auto 0;
+  font-style: italic;
+  color: #4a4a4a;
+}
+
+/* Closing takeaway under the RLRT objective */
+.takeaway-note {
+  margin: 1rem 0 0;
+  padding: 0.9rem 1.2rem;
+  border-left: 4px solid #1e6b52;
+  background: #f3f8f5;
+  border-radius: 0 8px 8px 0;
+  text-align: left;
 }
