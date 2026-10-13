@@ -43,7 +43,14 @@ Each method is a `policy_loss.loss_mode` with its own config under `verl/trainer
 
 ## Installation
 
-For environment setup, please follow the [installation instructions in the SDPO README](https://github.com/lasgroup/SDPO/blob/main/README.md).
+For environment setup, run `setup.sh` (tested on NVIDIA B200, CUDA 12.8):
+
+```bash
+bash setup.sh
+source .venv/bin/activate
+```
+
+Set `WANDB_API_KEY` beforehand to log in. On other hardware, follow the [installation instructions in the SDPO README](https://github.com/lasgroup/SDPO/blob/main/README.md) instead.
 
 ### Data Preparation
 We primarily use the [DAPO-Math-17k](https://huggingface.co/datasets/BytedTsinghua-SIA/DAPO-Math-17k) dataset for training. You can download it by running:
