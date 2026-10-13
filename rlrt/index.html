@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR - Jeonghye Kim, Jiwon Jeon, Dongsheng Li, Yuqing Yang">
+  <meta name="description" content="RLRT augments GRPO by reversing self-distillation on correct rollouts: it amplifies tokens where the student diverged from the teacher yet still succeeded, treating these as self-driven reasoning.">
+  <meta name="keywords" content="RLVR, reinforcement learning, self-distillation, reasoning, LLM post-training, exploration, GRPO, mathematical reasoning, Qwen3, information asymmetry">
+  <meta name="author" content="Jeonghye Kim, Jiwon Jeon, Dongsheng Li, Yuqing Yang">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="English">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Microsoft Research / KAIST">
+  <meta property="og:title" content="Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR">
+  <meta property="og:description" content="RLRT augments GRPO by reversing self-distillation on correct rollouts: it amplifies tokens where the student diverged from the teacher yet still succeeded, treating these as self-driven reasoning.">
+  <meta property="og:url" content="https://beanie00.github.io/self-distillation-analysis/rlrt">
+  <meta property="og:image" content="https://beanie00.github.io/self-distillation-analysis/rlrt/static/images/og_preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="RLRT — Rebellious Student: Reversing Teacher Signals for Reasoning Exploration">
+  <meta property="article:published_time" content="2026-01-01T00:00:00.000Z">
+  <meta property="article:author" content="Jeonghye Kim, Jiwon Jeon">
+  <meta property="article:section" content="Research">
+  <meta property="article:tag" content="RLVR">
+  <meta property="article:tag" content="self-distillation">
+  <meta property="article:tag" content="LLM reasoning">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image"> 
+  <meta name="twitter:site" content="@beanie0__0">
+  <meta name="twitter:creator" content="@beanie0__0">
+  <meta name="twitter:title" content="Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR">
+  <meta name="twitter:description" content="RLRT augments GRPO by reversing self-distillation on correct rollouts: it amplifies tokens where the student diverged from the teacher yet still succeeded.">
+  <meta name="twitter:image" content="https://beanie00.github.io/self-distillation-analysis/rlrt/static/images/og_preview.png">
+  <meta name="twitter:image:alt" content="RLRT — Rebellious Student">
+
+  <!-- Academic/Research Specific -->
+  <meta name="citation_title" content="Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR">
+  <meta name="citation_author" content="Kim, Jeonghye">
+  <meta name="citation_author" content="Jeon, Jiwon">
+  <meta name="citation_author" content="Li, Dongsheng">
+  <meta name="citation_author" content="Yang, Yuqing">
+  <meta name="citation_publication_date" content="2026">
+  <meta name="citation_conference_title" content="Advances in Neural Information Processing Systems (NeurIPS 2026)">
+  <meta name="citation_pdf_url" content="https://arxiv.org/pdf/2605.10781">
+  
+  <!-- Additional SEO -->
+  <meta name="theme-color" content="#2563eb">
+  <meta name="msapplication-TileColor" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://ajax.googleapis.com">
+  <link rel="preconnect" href="https://documentcloud.adobe.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+
+  <title>Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR | RLRT</title>
+  
+  <!-- Favicon and App Icons -->
+  <link rel="icon" type="image/svg+xml" href="static/images/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="static/images/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="static/images/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="static/images/apple-touch-icon.png">
+  
+  <!-- Critical CSS - Load synchronously -->
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+  
+  <!-- Non-critical CSS - Load asynchronously -->
+  <link rel="preload" href="static/css/bulma-carousel.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="static/css/bulma-slider.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="static/css/fontawesome.all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  
+  <noscript>
+    <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+    <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+    <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  </noscript>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body,{delimiters:[{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],throwOnError:false});"></script>
+
+  <script defer src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="https://documentcloud.adobe.com/view-sdk/main.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script defer src="static/js/bulma-carousel.min.js"></script>
+  <script defer src="static/js/bulma-slider.min.js"></script>
+  <script defer src="static/js/index.js"></script>
+  
+  <!-- Structured Data for Academic Papers -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ScholarlyArticle",
+    "headline": "Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR",
+    "description": "RLRT augments GRPO by reversing self-distillation on correct rollouts: it amplifies tokens where the student diverged from the teacher yet still succeeded, treating these as self-driven reasoning.",
+    "author": [
+      {
+        "@type": "Person",
+        "name": "Jeonghye Kim",
+        "affiliation": [
+          { "@type": "Organization", "name": "Microsoft Research" },
+          { "@type": "Organization", "name": "KAIST" }
+        ]
+      },
+      {
+        "@type": "Person",
+        "name": "Jiwon Jeon",
+        "affiliation": { "@type": "Organization", "name": "KAIST" }
+      },
+      {
+        "@type": "Person",
+        "name": "Dongsheng Li",
+        "affiliation": { "@type": "Organization", "name": "Microsoft Research" }
+      },
+      {
+        "@type": "Person",
+        "name": "Yuqing Yang",
+        "affiliation": { "@type": "Organization", "name": "Microsoft Research" }
+      }
+    ],
+    "datePublished": "2026-01-01",
+    "publisher": {
+      "@type": "Organization",
+      "name": "arXiv"
+    },
+    "url": "https://beanie00.github.io/self-distillation-analysis/rlrt",
+    "image": "https://beanie00.github.io/self-distillation-analysis/rlrt/static/images/og_preview.png",
+    "keywords": ["RLVR", "self-distillation", "LLM reasoning", "exploration", "GRPO", "mathematical reasoning", "information asymmetry"],
+    "abstract": "Self-distillation has emerged as a powerful framework for post-training LLMs, where a teacher conditioned on extra information guides a student without it, both from the same model. While this guidance is useful when the student has failed, on successful rollouts, the same mechanism instead overwrites the student's choices and suppresses its own reasoning. Therefore, we propose reading the original self-distillation signal in reverse: when the student succeeds along a path the teacher would not have predicted, these tokens reflect its self-driven reasoning. Building on this, we propose RLRT (RLVR with Reversed Teacher), which augments GRPO by reinforcing these tokens on correct rollouts. We interpret this as a new form of exploration in RLVR: not uniform diversity, but valuable exploration grounded in the student's own success. Across base, instruction-tuned, and thinking-tuned Qwen3 checkpoints, RLRT substantially outperforms self-distillation and exploration-based baselines, establishing information asymmetry as a new, principled design axis for RLVR.",
+    "isAccessibleForFree": true,
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "mainEntity": {
+      "@type": "WebPage",
+      "@id": "https://beanie00.github.io/self-distillation-analysis/rlrt"
+    },
+    "about": [
+      { "@type": "Thing", "name": "Reinforcement Learning with Verifiable Rewards" },
+      { "@type": "Thing", "name": "Self-Distillation" },
+      { "@type": "Thing", "name": "Large Language Model Reasoning" }
+    ]
+  }
+  </script>
+  
+  <!-- Organization Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Microsoft Research",
+    "url": "https://www.microsoft.com/en-us/research/",
+    "sameAs": [
+      "https://twitter.com/MSFTResearch"
+    ]
+  }
+  </script>
+</head>
+<body>
+
+  <button class="scroll-to-top" onclick="scrollToTop()" title="Scroll to top" aria-label="Scroll to top">
+    <i class="fas fa-chevron-up"></i>
+  </button>
+
+  <!-- More Works Dropdown -->
+  <div class="more-works-container">
+    <button class="more-works-btn" onclick="toggleMoreWorks()" title="View More Works from Our Lab">
+      <i class="fas fa-flask"></i>
+      More Works
+      <i class="fas fa-chevron-down dropdown-arrow"></i>
+    </button>
+    <div class="more-works-dropdown" id="moreWorksDropdown">
+      <div class="dropdown-header">
+        <h4>Related Works</h4>
+        <button class="close-btn" onclick="toggleMoreWorks()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="works-list">
+        <a href="https://arxiv.org/abs/2604.03128" class="work-item" target="_blank">
+          <div class="work-info">
+            <h5>Self-Distilled RLVR (RLSD)</h5>
+            <p>Reward-gated self-distillation where the teacher modulates only update magnitude — the closest comparison point to RLRT.</p>
+            <span class="work-venue">arXiv 2026</span>
+          </div>
+          <i class="fas fa-external-link-alt"></i>
+        </a>
+        <a href="https://arxiv.org/abs/2603.24472" class="work-item" target="_blank">
+          <div class="work-info">
+            <h5>Why Does Self-Distillation (Sometimes) Degrade Reasoning?</h5>
+            <p>Analysis revealing that self-distillation can suppress reflective tokens essential for robust reasoning — a key motivation for RLRT.</p>
+            <span class="work-venue">arXiv 2026</span>
+          </div>
+          <i class="fas fa-external-link-alt"></i>
+        </a>
+        <a href="https://arxiv.org/abs/2604.02288" class="work-item" target="_blank">
+          <div class="work-info">
+            <h5>SRPO: Unifying Group-Relative and Self-Distillation</h5>
+            <p>Routes correct rollouts to GRPO and incorrect ones to self-distillation — identifying "optimization ambiguity" in self-distillation.</p>
+            <span class="work-venue">arXiv 2026</span>
+          </div>
+          <i class="fas fa-external-link-alt"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <main id="main-content">
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title">Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR</h1>
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://www.beanie00.com/" target="_blank">Jeonghye Kim</a><sup>1,2*&diams;</sup>,</span>
+              <span class="author-block">
+                <a href="https://sites.google.com/view/jwjeon" target="_blank">Jiwon Jeon</a><sup>2*</sup>,</span>
+              <span class="author-block">
+                <a href="https://www.microsoft.com/en-us/research/people/dongsli/" target="_blank">Dongsheng Li</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://www.microsoft.com/en-us/research/people/yuqyang/" target="_blank">Yuqing Yang</a><sup>1&dagger;</sup>
+              </span>
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>Microsoft Research &nbsp;&nbsp; <sup>2</sup>KAIST</span>
+              <br>
+              <span class="author-block">NeurIPS 2026</span>
+              <br>
+              <span class="eql-cntrb">
+                <small><sup>*</sup>Equal contribution &nbsp;&nbsp; <sup>&diams;</sup>Work done during an internship at Microsoft Research &nbsp;&nbsp; <sup>&dagger;</sup>Corresponding author</small>
+              </span>
+            </div>
+
+            <div class="column has-text-centered">
+              <div class="publication-links">
+                <span class="link-block">
+                  <a href="https://arxiv.org/pdf/2605.10781" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                  </a>
+                </span>
+                  <span>Supplementary</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="https://github.com/beanie00/self-distillation-analysis" target="_blank"
+                  class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fab fa-github"></i></span>
+                  <span>Code</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Teaser -->
+  <section class="hero teaser">
+    <div class="container is-max-desktop">
+      <div class="hero-body">
+        <div class="content has-text-centered tldr-box" style="border: 3px solid #1e6b52; border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 2rem;">
+          <p class="is-size-4 has-text-weight-bold" style="color:#1e6b52; margin-bottom: 0.5rem;">RLRT is an LLM post-training method that teaches models how to think independently.</p>
+          <p class="is-size-5">Encouraging the model <strong>to think differently from the teacher's guidance</strong><br class="is-hidden-mobile"> while still getting the right answer leads to better reasoning.</p>
+        </div>
+        <img src="static/images/rlrt_concept.png" alt="The teacher tells the student to stop exploring; the student tries other methods and succeeds" style="width: 100%;">
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Reversing the teacher signal -->
+  <section class="section hero is-light">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Reversing the Teacher Signal</h2>
+      <div class="content has-text-justified">
+        <p>
+          Self-distillation trains a model (the <em>student</em>) to imitate a copy of itself that has already seen the answer (the <em>teacher</em>). A teacher that knows the answer has no reason to hesitate, so the student learns to drop words like <em>wait</em> and <em>maybe</em> and stops exploring. We flip the signal: on correct answers, we reward <strong>self-driven tokens</strong>, the choices the student made against the teacher's prediction that still led to the right answer.
+        </p>
+      </div>
+      <div class="columns">
+        <div class="column" style="flex: 2.19 1 0;">
+          <img src="static/images/self_driven_curve.png" alt="Training score when upweighting teacher-predicted vs. self-driven tokens" style="width: 100%;">
+          <p class="has-text-centered">Upweighting <strong style="color:#1e8a5f">self-driven tokens</strong> during GRPO significantly improves training efficiency, while upweighting <strong style="color:#c2185b">teacher-predicted tokens</strong> hurts it.</p>
+        </div>
+        <div class="column" style="flex: 2.86 1 0;">
+          <img src="static/images/explore_exploit_tokens.png" alt="Explore-leaning vs. exploit-leaning reasoning markers" style="width: 100%;">
+          <p class="has-text-centered"><strong style="color:#1e8a5f">Self-driven tokens open new paths</strong> (<em>wait, maybe, another</em>);<br><strong style="color:#c2185b">teacher-predicted tokens close them</strong> (<em>conclude, final, yield</em>).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Method -->
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">RLRT: RLVR with Reversed Teacher</h2>
+      <img src="static/images/RLRT.png" alt="RLRT training pipeline" style="display: block; width: 100%; margin-bottom: 1.5rem;">
+      <div class="content has-text-justified">
+        <p>
+          RLRT changes only how GRPO assigns credit to tokens. The teacher sees a successful rollout; the student does not. Each token gets a reverse weight \(w_t = P_S(y_t) / P_T(y_t)\) on correct rollouts, where \(P_S\) and \(P_T\) are the student and teacher token probabilities.
+        </p>
+        \[
+          A_t^{\mathrm{RLRT}} = \begin{cases}
+            A \cdot \bigl[(1-\lambda) + \lambda\cdot\mathrm{clip}(w_t,\, 1-\varepsilon_w,\, 1+\varepsilon_w)\bigr] & \text{if } r = 1, \\
+            A & \text{if } r = 0
+          \end{cases}
+        \]
+        <p class="has-text-centered"><small>\(A\): GRPO advantage; \(r\): correctness; \(\lambda\) sets the weighting strength (\(\lambda = 0\) is GRPO); \(\varepsilon_w\) bounds the clipped weight.</small></p>
+        <p class="has-text-centered" style="color:#1e6b52; font-weight: 600;">
+          Correct rollouts: amplify self-driven tokens (\(P_S &gt; P_T\)). Incorrect rollouts: keep GRPO.
+        </p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Results -->
+  <section class="section hero is-light">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Training and Benchmark Performance</h2>
+      <div class="content has-text-justified">
+        <p>
+          We train on DAPO-Math-17k with four Qwen3 backbones and evaluate on six math benchmarks (AIME24/25/26, HMMT26, AMC23, MATH500). RLRT trains faster and outperforms GRPO and self-distillation baselines on all four backbones, by <strong>up to 18%</strong>.
+        </p>
+      </div>
+      <img src="static/images/training_curves.png" alt="Training score curves on four Qwen3 backbones" style="display: block; width: 100%; margin-bottom: 1.5rem;">
+      <img src="static/images/benchmark_bars.png" alt="Mean avg@16 across six math benchmarks" style="display: block; width: 100%;">
+    </div>
+  </section>
+
+
+  <!-- Beyond the base policy -->
+  <section class="section">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">RLRT Expands Reasoning Beyond the Base Policy</h2>
+      <img src="static/images/distribution_shift.png" alt="JS divergence CCDF and base probability of new top-1 tokens" style="display: block; width: 100%; margin-bottom: 1rem;">
+      <div class="columns">
+        <div class="column">
+          <p><strong style="color:#1e6b52">(a) More positions change.</strong> Higher curve = more changed positions. RLRT changes the next-token distribution at more positions than GRPO or RLSD.</p>
+        </div>
+        <div class="column">
+          <p><strong style="color:#1e6b52">(b) Rare tokens become top-1.</strong> Tokens with base probability &lt;0.001 become the most likely next token over 10× as often with RLRT as with GRPO or RLSD.</p>
+        </div>
+      </div>
+      <img src="static/images/pass_at_k.png" alt="pass@k comparison with exploration baselines on AIME24 and AIME26" style="display: block; width: 75%; margin: 1.5rem auto 1rem auto;">
+      <p class="has-text-centered">
+        <strong style="color:#1e6b52">(c) Outperforms exploration baselines.</strong> On Qwen3-8B-Base, RLRT leads <strong>from pass@1 to pass@256</strong> on AIME24 and AIME26.<br>
+        <small>GRPO+EB: entropy bonus (token-level exploration). DIVER: sequence-level diversity.</small>
+      </p>
+    </div>
+  </section>
+  <!-- BibTeX -->
+  <section class="section" id="BibTeX">
+    <div class="container is-max-desktop content">
+      <div class="bibtex-header">
+        <h2 class="title">BibTeX</h2>
+        <button class="copy-bibtex-btn" onclick="copyBibTeX()" title="Copy BibTeX to clipboard">
+          <i class="fas fa-copy"></i>
+          <span class="copy-text">Copy</span>
+        </button>
+      </div>
+      <pre id="bibtex-code"><code>@inproceedings{kim2026rlrt,
+  title     = {Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR},
+  author    = {Kim, Jeonghye and Jeon, Jiwon and Li, Dongsheng and Yang, Yuqing},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2026}
+}</code></pre>
+    </div>
+  </section>
+
+
+  <footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+              This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
+              You are free to borrow the source code of this website, we just ask that you link back to this page in the footer. <br>
+              This website is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

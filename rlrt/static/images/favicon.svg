@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <rect x="0" y="0" width="240" height="240" rx="36" fill="#ffffff"/>
+  <text x="120" y="115" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="100" font-weight="700" letter-spacing="-2">
+    <tspan fill="#1a1a1a">R</tspan><tspan fill="#1a1a1a">L</tspan>
+  </text>
+  <text x="120" y="210" text-anchor="middle" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="100" font-weight="700" letter-spacing="-2">
+    <tspan fill="#3d9970">R</tspan><tspan fill="#d4799a">T</tspan>
+  </text>
+</svg>
