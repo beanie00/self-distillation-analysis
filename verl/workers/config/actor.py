@@ -60,6 +60,14 @@ class SelfDistillationConfig(BaseConfig):
         environment_feedback_only_without_solution (bool): If True, only use feedback when no solution is available (ignore feedback when solution exists).
         reprompt_template_feedback (str): Template for reprompting with feedback but no solution.
         reprompt_template_feedback_solution (str): Template for reprompting with both feedback and solution.
+        epsilon_w (float): Clipping bound ε_w for RLSD token-level evidence weights (paper §4.1).
+        rlsd_lambda_init (float): Initial value of RLSD mixing coefficient λ.
+        rlsd_lambda_decay_steps (int): Steps over which λ decays linearly from rlsd_lambda_init to 0.
+        rlsd_template (str): Template for RLSD teacher prompt. Uses {prompt}, {ground_truth} placeholders.
+        dynamic_weight_beta (Optional[float]): If set, enables entropy-aware token weighting (DW-SDPO,
+            SRPO paper §3.2). Per-token weights w̃_t = exp(-β · H_t) where H_t is the teacher's
+            entropy at token t; weights are normalized so that their mean over valid distillation
+            tokens is 1, preserving overall loss scale. Requires full_logit_distillation=True.
     """
 
     full_logit_distillation: bool = True
@@ -90,6 +98,12 @@ class SelfDistillationConfig(BaseConfig):
     )
     include_environment_feedback: bool = False
     environment_feedback_only_without_solution: bool = False
+    epsilon_w: float = 0.2
+    rlsd_lambda_init: float = 0.5
+    rlsd_lambda_decay_steps: int = 50
+    rlsd_template: str = "{prompt}\n\nThe correct answer is: {ground_truth}"
+    reweight_correct_only: bool = False
+    dynamic_weight_beta: Optional[float] = None
 
     def __post_init__(self):
         if not 0.0 <= self.alpha <= 1.0:

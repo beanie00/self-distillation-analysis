@@ -10,10 +10,14 @@ max_model_len: 10240
 
 actor_rollout_ref:
   actor:
-    ppo_mini_batch_size: 8
+    ppo_mini_batch_size: 128
+    optim:
+      lr_warmup_steps: 10
   rollout:
     n: 8
     calculate_log_probs: True
+    val_kwargs:
+      n: 1
 
 algorithm:
   adv_estimator: grpo
@@ -23,4 +27,4 @@ algorithm:
     rollout_is_threshold: 2.0
 
 data:
-  train_batch_size: 32
+  train_batch_size: 256

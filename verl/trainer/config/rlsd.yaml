@@ -1,0 +1,56 @@
+defaults:
+  - ppo_trainer
+  - user
+  - _self_
+
+# RLSD: RLVR with Self-Distillation (https://arxiv.org/abs/2604.03128)
+#
+# Key idea: use GRPO for update *direction* (environment reward) and the
+# teacher/student log-prob ratio to modulate update *magnitude* per token.
+# Privileged info = ground-truth answer only (no reasoning trace needed).
+#
+# MAX_PROMPT_LENGTH=4096
+# MAX_RESPONSE_LENGTH=4096
+# MAX_TEACHER_PREFIX ≈ MAX_PROMPT_LENGTH + 512  (ground-truth appended)
+# MAX_MODEL_LEN = MAX_PROMPT_LENGTH + MAX_RESPONSE_LENGTH = 8192
+max_model_len: 10240
+
+actor_rollout_ref:
+  actor:
+    ppo_mini_batch_size: 128
+    policy_loss:
+      loss_mode: rlsd
+    self_distillation:
+      # RLSD does NOT use full-logit distillation — only per-token log probs are needed
+      full_logit_distillation: False
+      distillation_topk: null
+      # Clipping bound for evidence weights (paper default ε_w = 0.2)
+      epsilon_w: 0.2
+      # λ schedule: starts at 0.5, decays to 0 over 50 steps (paper §5.1)
+      rlsd_lambda_init: 0.5
+      rlsd_lambda_decay_steps: 50
+      # Teacher sees: original prompt + "The correct answer is: {ground_truth}"
+      max_reprompt_len: 8704   # MAX_PROMPT_LENGTH + MAX_RESPONSE_LENGTH + 512
+      dont_reprompt_on_self_success: False
+      include_environment_feedback: False
+    optim:
+      lr: 1e-6  # Paper uses 1e-6 for GRPO/RLSD
+      lr_warmup_steps: 10
+  rollout:
+    n: 8
+    calculate_log_probs: True
+    val_kwargs:
+      n: 1
+
+algorithm:
+  adv_estimator: grpo
+  norm_adv_by_std_in_grpo: True
+  rollout_correction:
+    rollout_is: token
+    rollout_is_threshold: 2.0
+
+data:
+  train_batch_size: 256
+
+trainer:
+  val_before_train: False

@@ -222,6 +222,11 @@ def compute_data_metrics(batch: DataProto, use_critic: bool = True) -> dict[str,
         metrics["tool_call_counts/max"] = tool_call_counts.max()
         metrics["tool_call_counts/mean"] = tool_call_counts.mean()
 
+    if "incorrect_format" in batch.non_tensor_batch:
+        incorrect_format = batch.non_tensor_batch["incorrect_format"]
+        metrics["format/incorrect_ratio"] = float(incorrect_format.mean())
+        metrics["format/correct_ratio"] = 1.0 - float(incorrect_format.mean())
+
     return metrics
 
 

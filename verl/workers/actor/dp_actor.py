@@ -29,7 +29,7 @@ from torch.distributed.tensor import DTensor
 
 import verl.utils.torch_functional as verl_F
 from verl import DataProto
-from verl.trainer.ppo.core_algos import agg_loss, compute_self_distillation_loss, get_policy_loss_fn, kl_penalty
+from verl.trainer.ppo.core_algos import agg_loss, apply_rlsd_advantage_weighting, compute_self_distillation_loss, get_policy_loss_fn, kl_penalty
 from verl.utils.attention_utils import index_first_axis, pad_input, rearrange, unpad_input
 from verl.utils.device import get_device_id, get_device_name
 from verl.utils.fsdp_utils import FSDPModule, fsdp2_clip_grad_norm_
@@ -132,13 +132,18 @@ class DataParallelPPOActor(BasePPOActor):
     def _update_teacher(self) -> None:
         self_distillation_cfg = getattr(self.config, "self_distillation", None)
         loss_mode = self.config.policy_loss.get("loss_mode", "vanilla")
-        if not self_distillation_cfg or loss_mode != "sdpo":
+        if not self_distillation_cfg or loss_mode not in ("sdpo", "srpo", "rlsd", "rlrt"):
             return
         teacher_regularization = getattr(self_distillation_cfg, "teacher_regularization", "ema")
         if teacher_regularization != "ema":
             return
         update_rate = getattr(self_distillation_cfg, "teacher_update_rate", 0.0)
         if update_rate == 0.0:
+            return
+        if update_rate == 1.0:
+            # rate=1.0 means teacher always equals student; the worker skips
+            # building a separate teacher_module and the actor itself is used
+            # as the teacher, so there is nothing to copy.
             return
         if self.teacher_module is None or self.teacher_module is self.actor_module:
             raise ValueError("EMA teacher requires a separate teacher_module in the actor worker.")
@@ -681,7 +686,8 @@ class DataParallelPPOActor(BasePPOActor):
         pad_token_id = data.meta_info.get("pad_token_id", 0)
         loss_mode = self.config.policy_loss.get("loss_mode", "vanilla")
 
-        self_distillation_enabled = loss_mode == "sdpo"
+        self_distillation_enabled = loss_mode in ("sdpo", "srpo", "rlsd", "rlrt")
+        rlsd_enabled = loss_mode in ("rlsd", "rlrt")
         self_distillation_cfg = getattr(self.config, "self_distillation", None)
         if self_distillation_enabled:
             self_distillation_required_keys = {
@@ -707,6 +713,8 @@ class DataParallelPPOActor(BasePPOActor):
             select_keys.append("ref_log_prob")
         if self_distillation_enabled:
             select_keys.extend(list(self_distillation_required_keys))
+        if loss_mode == "srpo" and "correct_mask" in data.batch.keys():
+            select_keys.append("correct_mask")
         # Include pre-computed IS weights if present in batch
         # Weights are computed centrally in trainer and added to batch when algorithm.rollout_is=True
         if "rollout_is_weights" in data.batch.keys():
@@ -830,22 +838,110 @@ class DataParallelPPOActor(BasePPOActor):
                         teacher_log_prob = teacher_outputs["log_probs"]
                         teacher_all_logps = teacher_outputs.get("all_logps") if return_all_logps else None
                         teacher_topk_logps = teacher_outputs.get("topk_logps") if distill_topk else None
-                        pg_loss, pg_metrics = compute_self_distillation_loss(
-                            student_log_probs=log_prob,
-                            teacher_log_probs=teacher_log_prob,
-                            response_mask=response_mask,
-                            self_distillation_config=self_distillation_cfg,
-                            old_log_probs=old_log_prob,
-                            student_all_log_probs=student_all_logps,
-                            teacher_all_log_probs=teacher_all_logps,
-                            student_topk_log_probs=student_topk_logps,
-                            teacher_topk_log_probs=teacher_topk_logps,
-                            self_distillation_mask=self_distillation_mask,
-                            loss_agg_mode=loss_agg_mode,
-                            rollout_is_weights=rollout_is_weights,
-                        )
+                        if loss_mode == "srpo":
+                            # srpo:
+                            #   correct samples                          -> GRPO
+                            #   incorrect + has teacher target           -> SDPO
+                            #   incorrect + no teacher target (fallback) -> GRPO
+                            correct_mask = model_inputs.get("correct_mask")  # (bsz,)
+                            incorrect_mask = 1.0 - correct_mask
 
-                        pg_metrics["self_distillation/empty_target_batch"] = self_distillation_mask.sum().item() == 0
+                            # SDPO loss: incorrect samples that have a valid teacher target
+                            sdpo_mask = self_distillation_mask * incorrect_mask if self_distillation_mask is not None else incorrect_mask
+                            sdpo_token_mask = response_mask * sdpo_mask.unsqueeze(1)
+                            n_sdpo = sdpo_token_mask.sum()
+                            sdpo_loss, pg_metrics = compute_self_distillation_loss(
+                                student_log_probs=log_prob,
+                                teacher_log_probs=teacher_log_prob,
+                                response_mask=response_mask,
+                                self_distillation_config=self_distillation_cfg,
+                                old_log_probs=old_log_prob,
+                                student_all_log_probs=student_all_logps,
+                                teacher_all_log_probs=teacher_all_logps,
+                                student_topk_log_probs=student_topk_logps,
+                                teacher_topk_log_probs=teacher_topk_logps,
+                                self_distillation_mask=sdpo_mask,
+                                loss_agg_mode=loss_agg_mode,
+                                rollout_is_weights=rollout_is_weights,
+                            )
+                            pg_metrics["self_distillation/empty_sdpo_batch"] = sdpo_mask.sum().item() == 0
+
+                            # GRPO loss: correct samples + incorrect samples with no teacher target (fallback)
+                            no_teacher_mask = 1.0 - (self_distillation_mask if self_distillation_mask is not None else torch.zeros_like(correct_mask))
+                            grpo_mask = correct_mask + incorrect_mask * no_teacher_mask  # == 1 - sdpo_mask
+                            grpo_response_mask = response_mask * grpo_mask.unsqueeze(1)
+                            n_grpo = grpo_response_mask.sum()
+                            if n_grpo.item() > 0:
+                                policy_loss_fn = get_policy_loss_fn("vanilla")
+                                grpo_loss, grpo_metrics = policy_loss_fn(
+                                    old_log_prob=old_log_prob,
+                                    log_prob=log_prob,
+                                    advantages=advantages,
+                                    response_mask=grpo_response_mask,
+                                    loss_agg_mode=loss_agg_mode,
+                                    config=self.config,
+                                    rollout_is_weights=rollout_is_weights,
+                                )
+                                pg_metrics.update({f"srpo/grpo_{k.split('/')[-1]}": v for k, v in grpo_metrics.items()})
+                                pg_metrics["srpo/empty_grpo_batch"] = False
+                            else:
+                                grpo_loss = torch.zeros((), device=log_prob.device, dtype=log_prob.dtype)
+                                pg_metrics["srpo/empty_grpo_batch"] = True
+
+                            # Paper §3.3: combine branches as a single mean over the union of routed
+                            # tokens (Σ ℓ_GRPO + Σ ℓ_DW-SDPO) / (|Ω_GRPO| + |Ω_SDPO|), so each branch
+                            # contributes proportionally to the number of tokens it covers.
+                            n_total = (n_sdpo + n_grpo).clamp(min=1.0)
+                            pg_loss = (n_sdpo * sdpo_loss + n_grpo * grpo_loss) / n_total
+                            pg_metrics["srpo/n_sdpo_tokens"] = n_sdpo.item()
+                            pg_metrics["srpo/n_grpo_tokens"] = n_grpo.item()
+                        elif loss_mode in ("rlsd", "rlrt"):
+                            # RLSD: RLVR with Self-Distillation (https://arxiv.org/abs/2604.03128)
+                            # Direction  → environment reward (GRPO advantage sign)
+                            # Magnitude  → token-level evidence ratio PT(y_t)/PS(y_t)
+                            # Â_t = A * ((1-λ) + λ * clip((PT/PS)^±sign(A), 1-ε_w, 1+ε_w))
+                            # rlrt flips the sign: teacher-disfavored tokens get amplified
+                            epsilon_w = self_distillation_cfg.get("epsilon_w", 0.2)
+                            reweight_correct_only = self_distillation_cfg.get("reweight_correct_only", False)
+                            rlsd_lambda = data.meta_info.get("rlsd_lambda", 1.0)
+                            rlsd_advantages, rlsd_metrics = apply_rlsd_advantage_weighting(
+                                advantages=advantages,
+                                student_log_probs=log_prob.detach(),
+                                teacher_log_probs=teacher_log_prob,
+                                response_mask=response_mask,
+                                epsilon_w=epsilon_w,
+                                lambda_mix=rlsd_lambda,
+                                reverse=(loss_mode == "rlrt"),
+                                correct_only=reweight_correct_only,
+                            )
+                            policy_loss_fn = get_policy_loss_fn("vanilla")
+                            pg_loss, pg_metrics = policy_loss_fn(
+                                old_log_prob=old_log_prob,
+                                log_prob=log_prob,
+                                advantages=rlsd_advantages,
+                                response_mask=response_mask,
+                                loss_agg_mode=loss_agg_mode,
+                                config=self.config,
+                                rollout_is_weights=rollout_is_weights,
+                            )
+                            pg_metrics.update(rlsd_metrics)
+                        else:
+                            pg_loss, pg_metrics = compute_self_distillation_loss(
+                                student_log_probs=log_prob,
+                                teacher_log_probs=teacher_log_prob,
+                                response_mask=response_mask,
+                                self_distillation_config=self_distillation_cfg,
+                                old_log_probs=old_log_prob,
+                                student_all_log_probs=student_all_logps,
+                                teacher_all_log_probs=teacher_all_logps,
+                                student_topk_log_probs=student_topk_logps,
+                                teacher_topk_log_probs=teacher_topk_logps,
+                                self_distillation_mask=self_distillation_mask,
+                                loss_agg_mode=loss_agg_mode,
+                                rollout_is_weights=rollout_is_weights,
+                            )
+                            pg_metrics["self_distillation/empty_target_batch"] = self_distillation_mask.sum().item() == 0
+
                         micro_batch_metrics.update(pg_metrics)
                     else:
                         # gpg -> verl.trainer.ppo.core_algos.compute_policy_loss_gpg

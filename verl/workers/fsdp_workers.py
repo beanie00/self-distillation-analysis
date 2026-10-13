@@ -893,14 +893,21 @@ class ActorRolloutRefWorker(Worker, DistProfilerExtension):
             if self._is_actor:
                 self_distillation_cfg = self.config.actor.get("self_distillation", None)
                 loss_mode = self.config.actor.policy_loss.get("loss_mode", "vanilla")
-                if self_distillation_cfg is not None and loss_mode == "sdpo":
+                if self_distillation_cfg is not None and loss_mode in ("sdpo", "rlsd", "rlrt"):
                     teacher_regularization = self_distillation_cfg.get("teacher_regularization", "ema")
+                    teacher_update_rate = self_distillation_cfg.get("teacher_update_rate", 0.0)
                     if teacher_regularization == "trust-region":
                         self.actor.teacher_module = TrustRegionTeacher(
                             ref_module=self.ref_module_fsdp,
                             student_module=self.actor_module_fsdp,
-                            mix_coef=self_distillation_cfg.get("teacher_update_rate", 0.0),
+                            mix_coef=teacher_update_rate,
                         )
+                    elif teacher_update_rate == 1.0:
+                        # rate=1.0 means teacher always equals student after each step;
+                        # skip the separate copy entirely and let the actor itself act
+                        # as the teacher (handled by `teacher_module or actor_module`
+                        # fallback in DataParallelPPOActor).
+                        self.actor.teacher_module = None
                     else:
                         self.actor.teacher_module = self.ref_module_fsdp
 

@@ -65,5 +65,6 @@ trainer:
   test_freq: 10
   max_actor_ckpt_to_keep: null
   total_epochs: 500
+  total_training_steps: 100
   logger: ['console', 'wandb']
   default_local_dir: ${vars.ckpt_dir}/${trainer.experiment_name}  # experiment_name needs to be a unique identifier

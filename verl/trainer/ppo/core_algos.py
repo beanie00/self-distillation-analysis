@@ -1082,6 +1082,116 @@ def agg_loss(
     return loss
 
 
+def apply_rlsd_advantage_weighting(
+    advantages: torch.Tensor,
+    student_log_probs: torch.Tensor,
+    teacher_log_probs: torch.Tensor,
+    response_mask: torch.Tensor,
+    epsilon_w: float = 0.2,
+    lambda_mix: float = 1.0,
+    reverse: bool = False,
+    correct_only: bool = False,
+) -> tuple[torch.Tensor, dict[str, Any]]:
+    """Apply RLSD token-level credit assignment to sequence-level GRPO advantages.
+
+    From "Self-Distilled RLVR" (RLSD): instead of matching teacher distribution,
+    use the teacher/student log-prob ratio only to modulate *magnitude* of updates
+    while keeping the *direction* anchored to the environment reward.
+
+    For each token t in response i:
+        Δ_t  = sg(log PT(y_t) - log PS(y_t))
+        w_t  = exp(sign(A) * Δ_t) = (PT/PS)^sign(A)          [normal RLSD]
+        w_t  = exp(-sign(A) * Δ_t) = (PS/PT)^sign(A)         [RLRT]
+        Â_t  = A * ((1-λ) + λ * clip(w_t, 1-ε_w, 1+ε_w))
+
+    Args:
+        advantages: (bs, response_length) GRPO sequence-level advantages (broadcast to tokens).
+        student_log_probs: (bs, response_length) log π_θ(y_t | x, y<t).
+        teacher_log_probs: (bs, response_length) log π_θ(y_t | x, r, y<t) — stop-gradient applied inside.
+        response_mask: (bs, response_length) 1 for valid response tokens.
+        epsilon_w: clip bound for evidence weights (default 0.2, paper §4.1).
+        lambda_mix: mixing coefficient λ in [0,1]; 0 → vanilla GRPO, 1 → full RLSD reweighting.
+        reverse: if True, flip the sign so that teacher-disfavored tokens get amplified.
+        correct_only: if True, only apply reweighting for correct trajectories (A>0);
+            incorrect trajectories use vanilla GRPO advantages unchanged.
+
+    Returns:
+        weighted_advantages: (bs, response_length) token-level advantages after RLSD reweighting.
+        metrics: dict with diagnostic scalars.
+    """
+    with torch.no_grad():
+        # Δ_t = log PT(y_t) - log PS(y_t)  [stop-gradient already; both are detached via no_grad]
+        delta = teacher_log_probs - student_log_probs  # (bs, response_length)
+
+        # sign(A): +1 if reinforcing, -1 if penalising
+        sign_a = torch.sign(advantages)  # (bs, response_length)
+
+        # w_t = exp(±sign(A) * Δ_t): normal RLSD uses +, RLRT uses -
+        direction = -1.0 if reverse else 1.0
+        w = torch.exp(direction * sign_a * delta)  # (bs, response_length)
+
+        # Clip to trust-region [1-ε_w, 1+ε_w]
+        w_clipped = torch.clamp(w, 1.0 - epsilon_w, 1.0 + epsilon_w)
+
+        # Clip ratio (fraction of tokens that were clipped)
+        clip_low = (w < 1.0 - epsilon_w).float()
+        clip_high = (w > 1.0 + epsilon_w).float()
+        valid = response_mask.float()
+        n_valid = valid.sum().clamp(min=1.0)
+        clip_low_ratio = (clip_low * valid).sum() / n_valid
+        clip_high_ratio = (clip_high * valid).sum() / n_valid
+
+        # Â_t = A * ((1-λ) + λ * clip(w_t, 1-ε_w, 1+ε_w))
+        weighted_advantages = advantages * ((1.0 - lambda_mix) + lambda_mix * w_clipped)
+
+        if correct_only:
+            # Only apply reweighting for correct trajectories (A > 0);
+            # incorrect trajectories keep vanilla GRPO advantages.
+            weighted_advantages = torch.where(advantages > 0, weighted_advantages, advantages)
+
+    prefix = "rlrt" if reverse else "rlsd"
+    metrics = {
+        f"{prefix}/weight_mean": (w * valid).sum().item() / n_valid.item(),
+        f"{prefix}/weight_clip_low_ratio": clip_low_ratio.item(),
+        f"{prefix}/weight_clip_high_ratio": clip_high_ratio.item(),
+        f"{prefix}/lambda": lambda_mix,
+    }
+
+    # Robust statistics for debugging outlier-driven weight_mean blow-up.
+    # weight_mean is an arithmetic mean of exp(...) and is dominated by a handful
+    # of tokens with extreme |delta|; the metrics below characterise the bulk
+    # distribution and the tail separately.
+    with torch.no_grad():
+        valid_bool = valid.bool()
+        if valid_bool.any():
+            w_valid = w[valid_bool]
+            delta_valid = delta[valid_bool]
+            logw_valid = delta_valid * (direction * sign_a[valid_bool])  # = log(w) without re-exp+log roundtrip
+            abs_delta_valid = delta_valid.abs()
+
+            # Quantile / extremum stats on raw w (robust to exp() outliers)
+            metrics[f"{prefix}/weight_median"] = w_valid.median().item()
+            metrics[f"{prefix}/weight_max"] = w_valid.max().item()
+            metrics[f"{prefix}/weight_min"] = w_valid.min().item()
+            metrics[f"{prefix}/weight_p90"] = torch.quantile(w_valid, 0.90).item()
+            metrics[f"{prefix}/weight_p99"] = torch.quantile(w_valid, 0.99).item()
+
+            # Log-space statistics: geometric-mean analogue, robust to exp outliers
+            metrics[f"{prefix}/logweight_mean"] = logw_valid.mean().item()
+            metrics[f"{prefix}/logweight_std"] = logw_valid.std().item() if logw_valid.numel() > 1 else 0.0
+
+            # Raw teacher-student disagreement in log space
+            metrics[f"{prefix}/abs_delta_mean"] = abs_delta_valid.mean().item()
+            metrics[f"{prefix}/abs_delta_max"] = abs_delta_valid.max().item()
+            metrics[f"{prefix}/abs_delta_p99"] = torch.quantile(abs_delta_valid, 0.99).item()
+
+            # Extreme outliers: tokens whose w is far outside any reasonable clip
+            extreme_mask = (w_valid > 10.0) | (w_valid < 0.1)
+            metrics[f"{prefix}/extreme_outlier_ratio"] = extreme_mask.float().mean().item()
+
+    return weighted_advantages, metrics
+
+
 def compute_self_distillation_loss(
     student_log_probs: torch.Tensor,
     teacher_log_probs: torch.Tensor,
@@ -1164,6 +1274,27 @@ def compute_self_distillation_loss(
         assert self_distillation_config.alpha == 1.0, "Only reverse KL is supported for non-full-logit distillation"
         log_ratio = student_log_probs - teacher_log_probs
         per_token_loss = log_ratio.detach() * student_log_probs
+
+    # Entropy-aware dynamic weighting (DW-SDPO, SRPO paper §3.2):
+    #   w̃_t = exp(-β H_t), normalized so mean over Ω = 1 to preserve loss scale.
+    beta = getattr(self_distillation_config, "dynamic_weight_beta", None)
+    if beta is not None:
+        if not self_distillation_config.full_logit_distillation:
+            raise ValueError(
+                "dynamic_weight_beta requires full_logit_distillation=True to access the teacher distribution."
+            )
+        teacher_log_q = teacher_distill_log_probs.detach()
+        teacher_entropy = -(teacher_log_q.exp() * teacher_log_q).sum(-1)
+        log_w_tilde = -beta * teacher_entropy
+        valid = loss_mask.bool()
+        n_valid = valid.sum().clamp(min=1).to(log_w_tilde.dtype)
+        masked_log_w = torch.where(valid, log_w_tilde, torch.full_like(log_w_tilde, float("-inf")))
+        log_sum_w = torch.logsumexp(masked_log_w.flatten(), dim=0)
+        weights = torch.exp(log_w_tilde - log_sum_w + torch.log(n_valid))
+        per_token_loss = per_token_loss * weights
+        metrics["self_distillation/teacher_entropy_mean"] = (
+            verl_F.masked_mean(teacher_entropy, loss_mask).detach().item()
+        )
 
     is_clip = self_distillation_config.is_clip
     if is_clip is not None:
