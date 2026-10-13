@@ -12,15 +12,15 @@
 
 </div>
 
-Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions), giving fine-grained credit assignment with a simple setup. In math reasoning, however, imitating the teacher's confident reasoning suppresses the student's own expression of uncertainty and degrades it (*[Why Does Self-Distillation Degrade Reasoning?](https://arxiv.org/abs/2603.24472)*).
+Self-distillation lets a single model act as both teacher and student by conditioning the teacher on richer context (e.g., ground-truth solutions), giving fine-grained credit assignment with a simple setup. In math reasoning, however, imitating the teacher's confident reasoning suppresses the student's own expression of uncertainty and degrades it (*[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)*).
 
 Our answer is **[RLRT](https://arxiv.org/abs/2605.10781)**, which reverses the teacher signal on correct rollouts so that the student's own reasoning is reinforced rather than overwritten. Beyond RLRT, this repository brings representative self-distillation methods together in one `verl`-based codebase — a shared base for studying how to use self-distillation well in single-turn reasoning.
 
 ## News
 
 - [2026.10] 🔥 Unified release: `sdpo`, `srpo`, `rlsd`, and `rlrt` now live in a single codebase! See [Methods](#methods).
-- [2026.09] *Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR* accepted at [NeurIPS 2026](https://neurips.cc/)! 🎉🎉🎉 [[Paper](https://arxiv.org/abs/2605.10781)] [[Project Page](https://jiwonjeon9603.github.io/rlrt/)]
-- [2026.07] *Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?* accepted at [COLM 2026](https://colmweb.org/)! 🎉🎉🎉 [[Paper](https://arxiv.org/abs/2603.24472)] [[Project Page](https://beanie00.notion.site/why-does-self-distillation-degrade-reasoning)] [[Models](https://huggingface.co/collections/beanie00/self-distillation-analysis)] [[W&B](https://wandb.ai/beanie/SDPO-beanie/reports/Why-Does-Self-Distillation-Sometimes-Degrade-the-Reasoning-Capability-of-LLMs---VmlldzoxNjI1MTk5Mw?accessToken=i1ohtk0lbrcm63kkv1vd99f6jvb71sqoj32rgsokrs4l8r4vjz8q5mywtt8upwho)]
+- [2026.09] *Rebellious Student: Reversing Teacher Signals for Reasoning Exploration with Self-Distilled RLVR* accepted at NeurIPS 2026! 🎉🎉🎉 [[Paper](https://arxiv.org/abs/2605.10781)] [[Project Page](https://beanie00.github.io/self-distillation-analysis/rlrt/)]
+- [2026.07] *Why Does Self-Distillation (Sometimes) Degrade the Reasoning Capability of LLMs?* accepted at COLM 2026! 🎉🎉🎉 [[Paper](https://arxiv.org/abs/2603.24472)] [[Blog](https://beanie00.notion.site/why-does-self-distillation-degrade-reasoning)] [[Models](https://huggingface.co/collections/beanie00/self-distillation-analysis)] [[W&B](https://wandb.ai/beanie/SDPO-beanie/reports/Why-Does-Self-Distillation-Sometimes-Degrade-the-Reasoning-Capability-of-LLMs---VmlldzoxNjI1MTk5Mw?accessToken=i1ohtk0lbrcm63kkv1vd99f6jvb71sqoj32rgsokrs4l8r4vjz8q5mywtt8upwho)]
 - [2026.03] Code released and paper on self-distillation degradation released.
 
 ## Methods
@@ -51,7 +51,7 @@ We primarily use the [DAPO-Math-17k](https://huggingface.co/datasets/BytedTsingh
 bash experiments/math/prepare_dapo_data.sh
 ```
 
-The evaluation datasets are available in `data/math/evaluation`. The task-coverage splits used in *[Why Does Self-Distillation Degrade Reasoning?](https://arxiv.org/abs/2603.24472)* are in `data/math/section_6_2`.
+The evaluation datasets are available in `data/math/evaluation`. The task-coverage splits used in *[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)* are in `data/math/section_6_2`.
 
 ### Prompt Reformatting
 The DAPO-Math-17k dataset prompts the model to produce answers in the `Answer:` format. The following script reformats these prompts to elicit `\boxed{}` answers instead. We found that this reformatting consistently improved the model's accuracy.
@@ -77,7 +77,7 @@ python experiments/math/change_math_prompts.py
 
 ### Analyzing Reasoning Behavior Under Richer Information
 
-Reproduces the behavioral analysis from *[Why Does Self-Distillation Degrade Reasoning?](https://arxiv.org/abs/2603.24472)*: how the model's reasoning changes when it is given the solution as privileged context.
+Reproduces the behavioral analysis from *[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)*: how the model's reasoning changes when it is given the solution as privileged context.
 
 ```bash
 cd analyzing_reasoning_behavior
@@ -128,9 +128,7 @@ bash experiments/math/run_math_rlrt_qwen3_8b_nothink.sh         # Qwen3-8B, thin
 Every script reads its settings from the environment first, so GPUs, ports, and hyperparameters can be changed without editing the file. `CUDA_VISIBLE_DEVICES` follows `NUM_GPUS` unless you set it explicitly:
 
 ```bash
-NUM_GPUS=4 RAY_PORT=6500 \
-  EPSILON_W=0.5 LAMBDA_DECAY_STEPS=50 \
-  bash experiments/math/run_math_rlrt_qwen3_4b_base.sh
+NUM_GPUS=4 RAY_PORT=6500 bash experiments/math/run_math_rlrt_qwen3_4b_base.sh
 ```
 
 Pass `--dry-run` to print the resolved command without launching anything.
@@ -145,7 +143,7 @@ bash merge_models.sh
 bash eval.sh
 ```
 
-We release the trained checkpoints from *[Why Does Self-Distillation Degrade Reasoning?](https://arxiv.org/abs/2603.24472)* — Qwen3-8B (Thinking ON/OFF) and DeepSeek-Distill-7B — on [🤗 Hugging Face](https://huggingface.co/collections/beanie00/self-distillation-analysis). To evaluate them directly:
+We release the trained checkpoints from *[Why Does Self-Distillation...?](https://arxiv.org/abs/2603.24472)* — Qwen3-8B (Thinking ON/OFF) and DeepSeek-Distill-7B — on [🤗 Hugging Face](https://huggingface.co/collections/beanie00/self-distillation-analysis). To evaluate them directly:
 
 ```bash
 cd eval
